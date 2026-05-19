@@ -22,26 +22,19 @@ export const AppProvider = ({ children }) => {
   const [tools, setTools] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Auth Header Setup
-  useEffect(() => {
-    const interceptor = axios.interceptors.request.use((config) => {
-      const storedUser = localStorage.getItem('erp_user');
-      if (storedUser) {
-        const { token } = JSON.parse(storedUser);
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    });
-    return () => axios.interceptors.request.eject(interceptor);
-  }, []);
+  // Interceptor removed since we rely on httpOnly cookies sent automatically via withCredentials.
+  // axios.defaults.withCredentials = true is already set at the top of the file!
 
   // Auth Functions
   const login = async (email, password) => {
     try {
       const { data } = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
-      setUser(data);
-      localStorage.setItem('erp_user', JSON.stringify(data));
+      const safeUserData = { ...data };
+      delete safeUserData.token; // DO NOT store raw JWT in localStorage to prevent XSS
+      setUser(safeUserData);
+      localStorage.setItem('erp_user', JSON.stringify(safeUserData));
       toast.success(`Welcome back, ${data.name}!`);
+      fetchData(); // Fetch data immediately after successful login
       return true;
     } catch (error) {
       toast.error(error.response?.data?.message || "Login failed");
@@ -52,11 +45,20 @@ export const AppProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('erp_user');
+    setMaterials([]);
+    setProjects([]);
+    setVendors([]);
     toast.success("Logged out successfully");
   };
 
   // Fetch all data from Backend
   const fetchData = async () => {
+    const storedUser = localStorage.getItem('erp_user');
+    if (!storedUser) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const [mats, projs, vends] = await Promise.all([
         axios.get(`${API_BASE_URL}/materials`),
@@ -71,6 +73,9 @@ export const AppProvider = ({ children }) => {
       setLoading(false);
     } catch (error) {
       console.error("Error fetching data from API", error);
+      if (error.response && error.response.status === 401) {
+        logout();
+      }
       setLoading(false);
     }
   };
@@ -79,8 +84,10 @@ export const AppProvider = ({ children }) => {
     const storedUser = localStorage.getItem('erp_user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
+      fetchData();
+    } else {
+      setLoading(false);
     }
-    fetchData();
   }, []);
 
   // --- Material Master Functions ---

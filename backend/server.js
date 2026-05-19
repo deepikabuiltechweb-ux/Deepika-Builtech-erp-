@@ -5,8 +5,6 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import hpp from 'hpp';
-import mongoSanitize from 'express-mongo-sanitize';
-import xss from 'xss-clean';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import path from 'path';
@@ -49,11 +47,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // 4. Security Middlewares
+app.set('trust proxy', 1); // Trust first proxy (essential for Render/Heroku to get real client IPs for rate limiting)
 app.use(helmet());
 app.disable('x-powered-by');
 
+// Secure CORS to only allow specific frontend origin in production
+const allowedOrigins = process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : ['http://localhost:5173', 'http://localhost:5174'];
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 
@@ -69,8 +76,6 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10kb' })); // Max payload size
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
-app.use(mongoSanitize());
-app.use(xss());
 app.use(hpp()); // Prevent HTTP Parameter Pollution
 
 // 6. Performance Middlewares
