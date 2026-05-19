@@ -251,7 +251,12 @@ export default function Enquiry() {
             >
               Cancel
             </button>
-            <button type="submit" className="btn-primary px-8">
+            <button 
+              type="submit" 
+              className="btn-primary px-8"
+              disabled={formData.items.some(i => !i.name)}
+              title={formData.items.some(i => !i.name) ? "Please select a material from the dropdown for all rows" : ""}
+            >
               Save & Send Enquiry
             </button>
           </div>

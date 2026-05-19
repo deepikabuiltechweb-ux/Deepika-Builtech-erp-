@@ -14,25 +14,33 @@ export const AppProvider = ({ children }) => {
   const [materials, setMaterials] = useState([]);
   const [projects, setProjects] = useState([]);
   const [vendors, setVendors] = useState([]);
-  const [enquiries, setEnquiries] = useState([]);
-  const [quotations, setQuotations] = useState([]);
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [grns, setGrns] = useState([]);
-  const [issues, setIssues] = useState([]);
-  const [tools, setTools] = useState([]);
+  const [enquiries, setEnquiries] = useState(() => JSON.parse(localStorage.getItem('erp_enquiries')) || []);
+  const [quotations, setQuotations] = useState(() => JSON.parse(localStorage.getItem('erp_quotations')) || []);
+  const [purchaseOrders, setPurchaseOrders] = useState(() => JSON.parse(localStorage.getItem('erp_pos')) || []);
+  const [grns, setGrns] = useState(() => JSON.parse(localStorage.getItem('erp_grns')) || []);
+  const [issues, setIssues] = useState(() => JSON.parse(localStorage.getItem('erp_issues')) || []);
+  const [tools, setTools] = useState(() => JSON.parse(localStorage.getItem('erp_tools')) || []);
   const [loading, setLoading] = useState(true);
 
-  // Interceptor removed since we rely on httpOnly cookies sent automatically via withCredentials.
-  // axios.defaults.withCredentials = true is already set at the top of the file!
+  useEffect(() => {
+    const interceptor = axios.interceptors.request.use(config => {
+      const token = localStorage.getItem('erp_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+    return () => axios.interceptors.request.eject(interceptor);
+  }, []);
 
   // Auth Functions
   const login = async (email, password) => {
     try {
       const { data } = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
       const safeUserData = { ...data };
-      delete safeUserData.token; // DO NOT store raw JWT in localStorage to prevent XSS
       setUser(safeUserData);
       localStorage.setItem('erp_user', JSON.stringify(safeUserData));
+      localStorage.setItem('erp_token', data.token);
       toast.success(`Welcome back, ${data.name}!`);
       fetchData(); // Fetch data immediately after successful login
       return true;
@@ -45,6 +53,7 @@ export const AppProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('erp_user');
+    localStorage.removeItem('erp_token');
     setMaterials([]);
     setProjects([]);
     setVendors([]);
@@ -90,10 +99,24 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
+  // Save local data on change
+  useEffect(() => {
+    localStorage.setItem('erp_enquiries', JSON.stringify(enquiries));
+    localStorage.setItem('erp_quotations', JSON.stringify(quotations));
+    localStorage.setItem('erp_pos', JSON.stringify(purchaseOrders));
+    localStorage.setItem('erp_grns', JSON.stringify(grns));
+    localStorage.setItem('erp_issues', JSON.stringify(issues));
+    localStorage.setItem('erp_tools', JSON.stringify(tools));
+  }, [enquiries, quotations, purchaseOrders, grns, issues, tools]);
+
   // --- Material Master Functions ---
   const addMaterial = async (material) => {
     try {
-      const materialId = `MAT${String(materials.length + 1).padStart(3, '0')}`;
+      const maxIdNum = materials.reduce((max, m) => {
+        const num = parseInt(m.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const materialId = `MAT${String(maxIdNum + 1).padStart(3, '0')}`;
       const newMaterial = { ...material, id: materialId };
       const response = await axios.post(`${API_BASE_URL}/materials`, newMaterial);
       setMaterials([...materials, response.data.data || response.data]);
@@ -128,7 +151,11 @@ export const AppProvider = ({ children }) => {
   // --- Vendor Functions ---
   const addVendor = async (vendor) => {
     try {
-      const vendorId = `VND${String(vendors.length + 1).padStart(3, '0')}`;
+      const maxIdNum = vendors.reduce((max, v) => {
+        const num = parseInt(v.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const vendorId = `VND${String(maxIdNum + 1).padStart(3, '0')}`;
       const newVendor = { ...vendor, id: vendorId };
       const response = await axios.post(`${API_BASE_URL}/vendors`, newVendor);
       setVendors([...vendors, response.data.data || response.data]);
@@ -143,7 +170,11 @@ export const AppProvider = ({ children }) => {
   // --- Project Functions ---
   const addProject = async (project) => {
     try {
-      const projectId = `PRJ${String(projects.length + 1).padStart(3, '0')}`;
+      const maxIdNum = projects.reduce((max, p) => {
+        const num = parseInt(p.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const projectId = `PRJ${String(maxIdNum + 1).padStart(3, '0')}`;
       const newProject = { ...project, id: projectId };
       const response = await axios.post(`${API_BASE_URL}/projects`, newProject);
       setProjects([...projects, response.data.data || response.data]);

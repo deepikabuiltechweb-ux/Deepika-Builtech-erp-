@@ -206,7 +206,9 @@ export default function Quotations() {
                 const total = item.qty * item.unitPrice * (1 + item.gst / 100);
                 return (
                   <tr key={index}>
-                    <td className="p-3 font-medium">{item.name}</td>
+                    <td className="p-3 font-medium text-text-dark">
+                      {item.name || <span className="text-error italic text-sm">Unnamed Item (Please Recreate Enquiry)</span>}
+                    </td>
                     <td className="p-3 text-right">{item.qty} {item.unit}</td>
                     <td className="p-3">
                       <input 
@@ -408,7 +410,7 @@ export default function Quotations() {
           <div className="card">
             <h3 className="text-lg font-semibold mb-6">Quote Comparison (Total)</h3>
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <BarChart data={chartData}>
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
                   <YAxis hide />

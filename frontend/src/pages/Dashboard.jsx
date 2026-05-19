@@ -99,7 +99,7 @@ export default function Dashboard() {
         <div className="card">
           <h3 className="text-lg font-semibold mb-6">Monthly Purchase Trend</h3>
           <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <LineChart data={purchaseTrendData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748B', fontSize: 12}} />
@@ -123,7 +123,7 @@ export default function Dashboard() {
         <div className="card">
           <h3 className="text-lg font-semibold mb-6">Top 5 Materials by Value</h3>
           <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={topMaterialsData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" hide />
@@ -144,7 +144,7 @@ export default function Dashboard() {
         <div className="card">
           <h3 className="text-lg font-semibold mb-6">Stock by Category</h3>
           <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
                 <Pie
                   data={categoryData}

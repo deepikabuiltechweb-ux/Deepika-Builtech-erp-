@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import Autocomplete from '../components/ui/Autocomplete';
-import { ArrowUpRight, Plus, Trash2, CheckCircle, Package, History } from 'lucide-react';
+import { ArrowUpRight, Plus, Trash2, CheckCircle, Package, History, Eye } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { twMerge } from 'tailwind-merge';
@@ -12,7 +12,7 @@ function cn(...inputs) {
 }
 
 export default function IssueMaterial() {
-  const { materials, projects, issues, setIssues, deleteIssue, deductStockOnIssue, isAdmin, addProject } = useApp();
+  const { materials, projects, issues, setIssues, deleteIssue, deductStockOnIssue, isAdmin, addProject, purchaseOrders } = useApp();
   const [showForm, setShowForm] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -27,7 +27,14 @@ export default function IssueMaterial() {
   const handleProjectSelect = (projId) => {
     const proj = projects.find(p => p.id === projId);
     if (proj) {
-      setFormData({ ...formData, projectId: projId, workOrderNo: proj.id });
+      setFormData({ ...formData, projectId: projId });
+    }
+  };
+
+  const handlePOSelect = (poId) => {
+    const po = purchaseOrders.find(p => p.id === poId);
+    if (po) {
+      setFormData({ ...formData, workOrderNo: po.id, projectId: po.projectId });
     }
   };
 
@@ -54,6 +61,12 @@ export default function IssueMaterial() {
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    // Validate Purchase Order
+    if (!purchaseOrders.find(po => po.id === formData.workOrderNo)) {
+      toast.error("You must select a valid, existing Purchase Order!");
+      return;
+    }
+
     // Check stock availability
     const outOfStock = formData.items.find(item => item.qty > item.available);
     if (outOfStock) {
@@ -120,8 +133,12 @@ export default function IssueMaterial() {
                  <input type="text" className="input-field" placeholder="Employee Name" value={formData.issuedTo} onChange={e => setFormData({...formData, issuedTo: e.target.value})} />
               </div>
               <div>
-                 <label className="block text-sm font-medium text-text-gray mb-1">Purpose / WO No</label>
-                 <input type="text" className="input-field" value={formData.workOrderNo} onChange={e => setFormData({...formData, workOrderNo: e.target.value})} />
+                 <label className="block text-sm font-medium text-text-gray mb-1">Purchase Order</label>
+                 <Autocomplete
+                    options={purchaseOrders.map(po => ({ ...po, name: po.id }))}
+                    onSelect={(po) => handlePOSelect(po.id)}
+                    placeholder="Select existing PO..."
+                 />
               </div>
            </div>
 

@@ -32,10 +32,14 @@ export const cache = (ttlSeconds = 300) => {
 };
 
 export const clearCache = async (pattern) => {
-  const client = getRedisClient();
-  if (!client) return;
-  const keys = await client.keys(`cache:${pattern}*`);
-  if (keys.length > 0) {
-    await client.del(keys);
+  try {
+    const client = getRedisClient();
+    if (!client || client.status !== 'ready') return;
+    const keys = await client.keys(`cache:${pattern}*`);
+    if (keys.length > 0) {
+      await client.del(keys);
+    }
+  } catch (error) {
+    console.warn(`Redis clearCache bypassed: ${error.message}`);
   }
 };
