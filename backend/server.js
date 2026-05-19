@@ -92,20 +92,11 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Serve Static Assets in Production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/dist')));
-}
-
 // 7. Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1', apiRoutes);
 
-if (process.env.NODE_ENV === 'production') {
-  app.get(/.*/, (req, res) =>
-    res.sendFile(path.resolve(__dirname, '../frontend', 'dist', 'index.html'))
-  );
-}
+// (Static frontend serving removed because frontend is hosted separately on Vercel)
 
 // 8. Error Handling
 app.use(notFound);
