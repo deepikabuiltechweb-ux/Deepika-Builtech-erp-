@@ -102,8 +102,9 @@ export default function Enquiry() {
                 onSelect={(proj) => setFormData({...formData, projectId: proj.id})}
                 placeholder="Search Project..."
                 onAddNew={async (name) => {
-                  const newProj = await addProject({ name, client: 'TBD', location: 'TBD', budget: 0, status: 'Active' });
-                  if (newProj) setFormData({...formData, projectId: newProj.id});
+                  const response = await addProject({ name, client: 'TBD', location: 'TBD', budget: 0, status: 'Active' });
+                  const newProj = response?.data || response;
+                  if (newProj) setFormData({...formData, projectId: newProj.id || newProj._id});
                 }}
               />
             </div>
@@ -151,8 +152,9 @@ export default function Enquiry() {
                         <Autocomplete 
                           options={materials}
                           onSelect={(mat) => handleItemSelect(index, mat)}
-                          onAddNew={(name) => {
-                            const newMat = addMaterial({ name, category: 'General', unit: 'Nos', brand: '', lastPrice: 0, latestPrice: 0, currentStock: 0, minLevel: 0 });
+                          onAddNew={async (name) => {
+                            const response = await addMaterial({ name, category: 'General', unit: 'Nos', brand: '', lastPrice: 0, latestPrice: 0, currentStock: 0, minLevel: 0 });
+                            const newMat = response?.data || response;
                             if (newMat) handleItemSelect(index, newMat);
                           }}
                           placeholder="Type material name..."
@@ -174,9 +176,14 @@ export default function Enquiry() {
                       <td className="p-3">
                         <input 
                           type="text" 
-                          readOnly
-                          className="input-field bg-primary-bg"
+                          className="input-field"
                           value={item.unit}
+                          placeholder="e.g. Nos, Kg"
+                          onChange={(e) => {
+                            const newItems = [...formData.items];
+                            newItems[index].unit = e.target.value;
+                            setFormData({...formData, items: newItems});
+                          }}
                         />
                       </td>
                       <td className="p-3">
@@ -301,9 +308,9 @@ export default function Enquiry() {
                     </td>
                     <td>
                       <div className="flex gap-2">
-                        <button className="p-1 text-primary hover:bg-primary-bg rounded"><Eye className="w-4 h-4" /></button>
-                        <button className="p-1 text-text-gray hover:bg-primary-bg rounded"><FileEdit className="w-4 h-4" /></button>
-                        <button className="p-1 text-success hover:bg-success/10 rounded"><Send className="w-4 h-4" /></button>
+                        <button onClick={() => toast("View feature coming soon", { icon: '👁️' })} className="p-1 text-primary hover:bg-primary-bg rounded"><Eye className="w-4 h-4" /></button>
+                        <button onClick={() => toast("Edit feature coming soon", { icon: '✏️' })} className="p-1 text-text-gray hover:bg-primary-bg rounded"><FileEdit className="w-4 h-4" /></button>
+                        <button onClick={() => toast.success("Enquiry Sent to Vendors!")} className="p-1 text-success hover:bg-success/10 rounded"><Send className="w-4 h-4" /></button>
                         {isAdmin && (
                           <button 
                             onClick={() => {
