@@ -35,7 +35,7 @@ export default function Login() {
             <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-8">
               <Warehouse className="text-primary-dark w-10 h-10" />
             </div>
-            <h1 className="text-4xl font-bold mb-4">PEB ERP</h1>
+            <h1 className="text-4xl font-bold mb-4">DEEPIKA BUILTECH  ERP</h1>
             <p className="text-white/70 leading-relaxed">
               Streamlining Warehouse Construction Management with Precision and Efficiency.
             </p>
