@@ -12,7 +12,7 @@ function cn(...inputs) {
 }
 
 export default function Enquiry() {
-  const { materials, projects, vendors, enquiries, addEnquiry, deleteEnquiry, addMaterial, isAdmin, addProject } = useApp();
+  const { materials, projects, vendors, enquiries, addEnquiry, deleteEnquiry, addMaterial, isAdmin, isPurchaseTeam, isStoreTeam, addProject } = useApp();
   const [showForm, setShowForm] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -146,10 +146,10 @@ export default function Enquiry() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-text-dark">Purchase Enquiry</h1>
+          <h1 className="text-2xl font-bold text-text-dark">{isPurchaseTeam && !isAdmin ? "Pending Enquiries" : "Purchase Enquiry"}</h1>
           <p className="text-text-gray">Request quotations from vendors for project materials.</p>
         </div>
-        {!showForm && (
+        {!showForm && (isStoreTeam || isAdmin) && (
           <button onClick={() => setShowForm(true)} className="btn-primary">
             <Plus className="w-4 h-4" /> Create Enquiry
           </button>
@@ -406,8 +406,23 @@ export default function Enquiry() {
                     <td>
                       <div className="flex gap-2">
                         <button onClick={() => toast("View feature coming soon", { icon: '👁️' })} className="p-1 text-primary hover:bg-primary-bg rounded"><Eye className="w-4 h-4" /></button>
-                        <button onClick={() => toast("Edit feature coming soon", { icon: '✏️' })} className="p-1 text-text-gray hover:bg-primary-bg rounded"><FileEdit className="w-4 h-4" /></button>
-                        <button onClick={() => toast.success("Enquiry Sent to Vendors!")} className="p-1 text-success hover:bg-success/10 rounded"><Send className="w-4 h-4" /></button>
+                        {(isStoreTeam || isAdmin) && (
+                          <button onClick={() => toast("Edit feature coming soon", { icon: '✏️' })} className="p-1 text-text-gray hover:bg-primary-bg rounded"><FileEdit className="w-4 h-4" /></button>
+                        )}
+                        {(isStoreTeam || isAdmin) && (
+                          <button onClick={() => toast.success("Enquiry Sent to Vendors!")} className="p-1 text-success hover:bg-success/10 rounded"><Send className="w-4 h-4" /></button>
+                        )}
+                        {enq.status === 'Open' && (isPurchaseTeam || isAdmin) && (
+                          <button 
+                            onClick={() => {
+                              window.location.href = `/quotations?enquiryId=${enq.id}`;
+                            }}
+                            className="flex items-center gap-1 text-xs font-semibold text-success px-2 py-1 bg-success/10 rounded hover:bg-success/20"
+                            title="Confirm and Record Vendor Quotation"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" /> Confirm & Quote
+                          </button>
+                        )}
                         {isAdmin && (
                           <button 
                             onClick={() => {

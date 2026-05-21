@@ -67,7 +67,12 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
 
   const allNavItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'staff', 'viewer', 'store_team', 'purchase_team'] },
-    { path: '/enquiry', label: 'Enquiry', icon: Search, roles: ['admin', 'staff', 'store_team'] },
+    { 
+      path: '/enquiry', 
+      label: user?.role === 'purchase_team' ? 'Pending Enquiries' : 'Enquiry', 
+      icon: Search, 
+      roles: ['admin', 'staff', 'store_team', 'purchase_team'] 
+    },
     { path: '/quotations', label: 'Quotations', icon: FileText, roles: ['admin', 'staff', 'purchase_team'] },
     { path: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, roles: ['admin', 'staff', 'purchase_team'] },
     { path: '/store', label: 'Store / GRN', icon: Warehouse, roles: ['admin', 'staff', 'store_team'] },

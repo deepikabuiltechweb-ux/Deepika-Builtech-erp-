@@ -49,6 +49,33 @@ export default function Quotations() {
     }
   };
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const enqId = params.get('enquiryId');
+    if (enqId && enquiries.length > 0) {
+      const enq = enquiries.find(e => e.id === enqId);
+      if (enq) {
+        setView('entry');
+        setEntryForm(prev => ({
+          ...prev,
+          enquiryId: enqId,
+          items: enq.items.map(item => ({
+            materialId: item.materialId,
+            name: item.name,
+            qty: item.qty,
+            unit: item.unit,
+            unitPrice: 0,
+            gst: 18,
+            deliveryDays: 7,
+            brand: ''
+          }))
+        }));
+        // Clean up query param
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, [enquiries]);
+
   const handleSaveQuotation = async (e) => {
     e.preventDefault();
     const success = await addQuotation(entryForm);
