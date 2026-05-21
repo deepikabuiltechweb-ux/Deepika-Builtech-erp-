@@ -28,7 +28,8 @@ export default function Reports() {
   const getToolIssuesData = () => {
     return toolIssues.map(t => {
       const toolName = tools.find(tl => tl.id === t.toolId)?.name || t.toolName || 'N/A';
-      const project = projects.find(p => p.id === t.projectId)?.name || 'N/A';
+      const foundProject = projects.find(p => p.id === t.projectId || p._id === t.projectId || p.name === t.projectId);
+      const project = foundProject ? foundProject.name : (t.projectId || 'N/A');
       return {
         id: t.id,
         toolName,

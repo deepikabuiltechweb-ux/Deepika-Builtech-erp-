@@ -117,8 +117,8 @@ export default function Tools() {
       toast.error("Please enter the name of the employee receiving the tool.");
       return;
     }
-    if (!formData.projectId) {
-      toast.error("Please select a project.");
+    if (!formData.projectId || !formData.projectId.trim()) {
+      toast.error("Please enter or select a project.");
       return;
     }
     if (!formData.expectedReturnDate) {
@@ -299,7 +299,7 @@ export default function Tools() {
                   ) : (
                     toolIssues.map(issue => {
                       const tool = tools.find(t => t.id === issue.toolId);
-                      const project = projects.find(p => p.id === issue.projectId);
+                      const project = projects.find(p => p.id === issue.projectId || p._id === issue.projectId || p.name === issue.projectId);
                       return (
                         <tr key={issue.id} className="hover:bg-slate-50 transition-colors">
                           <td className="font-semibold text-text-dark">
@@ -316,7 +316,7 @@ export default function Tools() {
                           </td>
                           <td>
                             <span className="font-semibold text-xs text-text-dark bg-slate-100 px-2.5 py-1 rounded">
-                              {project?.name || 'N/A'}
+                              {project ? project.name : (issue.projectId || 'N/A')}
                             </span>
                           </td>
                           <td>
@@ -427,19 +427,20 @@ export default function Tools() {
 
                 <div>
                   <label className="block text-xs font-bold text-text-gray uppercase tracking-wider mb-1">Assign to Project</label>
-                  <select 
+                  <input 
+                    type="text" 
+                    list="projects-datalist"
                     required 
+                    placeholder="Type or select a project..."
                     className="input-field text-sm"
                     value={formData.projectId}
                     onChange={(e) => setFormData({ ...formData, projectId: e.target.value })}
-                  >
-                    <option value="">-- Choose Project --</option>
+                  />
+                  <datalist id="projects-datalist">
                     {projects.map(p => (
-                      <option key={p.id || p._id} value={p.id || p._id}>
-                        {p.name}
-                      </option>
+                      <option key={p.id || p._id} value={p.name} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
