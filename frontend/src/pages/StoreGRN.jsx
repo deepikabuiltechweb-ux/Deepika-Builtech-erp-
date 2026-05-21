@@ -12,7 +12,7 @@ function cn(...inputs) {
 }
 
 export default function StoreGRN() {
-  const { grns, purchaseOrders, setGrns, deleteGRN, updateStockOnGRN, vendors, setPurchaseOrders, isAdmin } = useApp();
+  const { grns, purchaseOrders, addGRN, deleteGRN, updateStockOnGRN, vendors, updatePurchaseOrder, isAdmin } = useApp();
   const [showEntry, setShowEntry] = useState(false);
   const [selectedPOId, setSelectedPOId] = useState('');
   
@@ -47,36 +47,34 @@ export default function StoreGRN() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    const vendorName = vendors.find(v => v.id === purchaseOrders.find(p => p.id === formData.poRef)?.vendorId)?.name || 'Unknown Vendor';
     const newGRN = {
-      id: `GRN-2024-${String(grns.length + 1).padStart(3, '0')}`,
       ...formData,
-      vendorName: vendors.find(v => v.id === purchaseOrders.find(p => p.id === formData.poRef)?.vendorId)?.name || 'Unknown Vendor'
+      vendorName
     };
 
-    setGrns([...grns, newGRN]);
-    
-    // Update stock using business logic in context
-    updateStockOnGRN(formData.items);
+    const success = await addGRN(newGRN);
+    if (success) {
+      // Update stock using business logic in context
+      await updateStockOnGRN(formData.items);
 
-    // Update PO status
-    setPurchaseOrders(prev => prev.map(p => 
-      p.id === formData.poRef ? { ...p, status: 'Complete' } : p
-    ));
+      // Update PO status
+      await updatePurchaseOrder(formData.poRef, { status: 'Complete' });
 
-    toast.success("GRN saved and Inventory updated!");
-    setShowEntry(false);
-    setFormData({
-      grnDate: format(new Date(), 'yyyy-MM-dd'),
-      poRef: '',
-      vehicleNo: '',
-      driverName: '',
-      dcNo: '',
-      receivedBy: 'Store Manager',
-      items: [],
-      remarks: ''
-    });
+      setShowEntry(false);
+      setFormData({
+        grnDate: format(new Date(), 'yyyy-MM-dd'),
+        poRef: '',
+        vehicleNo: '',
+        driverName: '',
+        dcNo: '',
+        receivedBy: 'Store Manager',
+        items: [],
+        remarks: ''
+      });
+    }
   };
 
   return (

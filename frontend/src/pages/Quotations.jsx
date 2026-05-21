@@ -16,7 +16,7 @@ function cn(...inputs) {
 }
 
 export default function Quotations() {
-  const { enquiries, vendors, quotations, setQuotations, deleteQuotation, setEnquiries, purchaseOrders, setPurchaseOrders, isAdmin, addVendor } = useApp();
+  const { enquiries, vendors, quotations, addQuotation, deleteQuotation, updateEnquiry, purchaseOrders, addPurchaseOrder, isAdmin, addVendor } = useApp();
   const [view, setView] = useState('list'); // 'list', 'entry', 'comparison'
   const [selectedEnquiryId, setSelectedEnquiryId] = useState('');
   
@@ -49,21 +49,14 @@ export default function Quotations() {
     }
   };
 
-  const handleSaveQuotation = (e) => {
+  const handleSaveQuotation = async (e) => {
     e.preventDefault();
-    const newQuote = {
-      id: `QUO-${String(quotations.length + 1).padStart(3, '0')}`,
-      ...entryForm
-    };
-    setQuotations([...quotations, newQuote]);
-    
-    // Update enquiry status
-    setEnquiries(prev => prev.map(e => 
-      e.id === entryForm.enquiryId ? { ...e, status: 'Quoted' } : e
-    ));
-
-    toast.success("Quotation recorded successfully!");
-    setView('list');
+    const success = await addQuotation(entryForm);
+    if (success) {
+      // Update enquiry status
+      await updateEnquiry(entryForm.enquiryId, { status: 'Quoted' });
+      setView('list');
+    }
   };
 
   const renderList = () => (
@@ -320,9 +313,8 @@ export default function Quotations() {
       amount: q.items.reduce((acc, i) => acc + (i.unitPrice * i.qty * (1 + i.gst/100)), 0)
     }));
 
-    const createPO = (quote) => {
+    const createPO = async (quote) => {
       const newPO = {
-        id: `PO-2024-${String(purchaseOrders.length + 1).padStart(3, '0')}`,
         date: new Date().toISOString(),
         vendorId: quote.vendorId,
         enquiryId: selectedEnquiryId,
@@ -338,8 +330,7 @@ export default function Quotations() {
         })),
         status: 'Sent'
       };
-      setPurchaseOrders([...purchaseOrders, newPO]);
-      toast.success(`PO ${newPO.id} generated for ${vendors.find(v => v.id === quote.vendorId)?.name}!`);
+      await addPurchaseOrder(newPO);
     };
 
     return (

@@ -12,7 +12,7 @@ function cn(...inputs) {
 }
 
 export default function Enquiry() {
-  const { materials, projects, vendors, enquiries, setEnquiries, deleteEnquiry, addMaterial, isAdmin, addProject } = useApp();
+  const { materials, projects, vendors, enquiries, addEnquiry, deleteEnquiry, addMaterial, isAdmin, addProject } = useApp();
   const [showForm, setShowForm] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -127,24 +127,19 @@ export default function Enquiry() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const newEnquiry = {
-      id: `ENQ-${String(enquiries.length + 1).padStart(3, '0')}`,
-      date: new Date().toISOString(),
-      ...formData,
-      status: 'Open'
-    };
-    setEnquiries([...enquiries, newEnquiry]);
-    toast.success("Enquiry created successfully!");
-    setShowForm(false);
-    setFormData({
-      projectId: '',
-      workOrderNo: '',
-      requiredDate: '',
-      items: [{ id: Date.now(), materialId: '', name: '', qty: 0, unit: '', requiredDate: '', isSubItem: false, mainNum: 1, displayNum: '1' }],
-      selectedVendors: []
-    });
+    const success = await addEnquiry(formData);
+    if (success) {
+      setShowForm(false);
+      setFormData({
+        projectId: '',
+        workOrderNo: '',
+        requiredDate: '',
+        items: [{ id: Date.now(), materialId: '', name: '', qty: 0, unit: '', requiredDate: '', isSubItem: false, mainNum: 1, displayNum: '1' }],
+        selectedVendors: []
+      });
+    }
   };
 
   return (

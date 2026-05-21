@@ -3,6 +3,13 @@ import mongoose from 'mongoose';
 import Material from '../models/Material.js';
 import Project from '../models/Project.js';
 import Vendor from '../models/Vendor.js';
+import Enquiry from '../models/Enquiry.js';
+import Quotation from '../models/Quotation.js';
+import PurchaseOrder from '../models/PurchaseOrder.js';
+import GRN from '../models/GRN.js';
+import Issue from '../models/Issue.js';
+import Tool from '../models/Tool.js';
+import ToolIssue from '../models/ToolIssue.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { cache, clearCache } from '../middleware/cache.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -91,6 +98,13 @@ const createCRUD = (model, name) => {
 createCRUD(Material, 'materials');
 createCRUD(Project, 'projects');
 createCRUD(Vendor, 'vendors');
+createCRUD(Enquiry, 'enquiries');
+createCRUD(Quotation, 'quotations');
+createCRUD(PurchaseOrder, 'purchaseorders');
+createCRUD(GRN, 'grns');
+createCRUD(Issue, 'issues');
+createCRUD(Tool, 'tools');
+createCRUD(ToolIssue, 'toolissues');
 
 // GRN
 router.post('/grn', protect, authorize('superadmin', 'admin', 'manager', 'staff', 'store_team'), asyncHandler(async (req, res) => {
@@ -106,6 +120,21 @@ router.post('/grn', protect, authorize('superadmin', 'admin', 'manager', 'staff'
     }
     await clearCache(`/api/v1/materials`);
     res.status(200).json(new ApiResponse(200, null, 'Stock updated and GRN processed'));
+}));
+
+// Material Issue Stock Deduction
+router.post('/issue', protect, authorize('superadmin', 'admin', 'manager', 'staff', 'store_team'), asyncHandler(async (req, res) => {
+    const { items } = req.body;
+    for (const item of items) {
+       await Material.findOneAndUpdate(
+         { id: item.materialId },
+         { 
+           $inc: { currentStock: -item.qty }
+         }
+       );
+    }
+    await clearCache(`/api/v1/materials`);
+    res.status(200).json(new ApiResponse(200, null, 'Stock updated and Material Issue processed'));
 }));
 
 export default router;

@@ -11,7 +11,7 @@ function cn(...inputs) {
 }
 
 export default function Tools() {
-  const { tools, setTools, addTool, updateTool, deleteTool, toolIssues, setToolIssues, projects, isAdmin, isStoreTeam } = useApp();
+  const { tools, setTools, addTool, updateTool, deleteTool, toolIssues, addToolIssue, updateToolIssue, deleteToolIssue, projects, isAdmin, isStoreTeam } = useApp();
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [showAddToolModal, setShowAddToolModal] = useState(false);
   const [editingTool, setEditingTool] = useState(null);
@@ -98,7 +98,7 @@ export default function Tools() {
     expectedReturnDate: '',
   });
 
-  const handleSubmitIssue = (e) => {
+  const handleSubmitIssue = async (e) => {
     e.preventDefault();
     const tool = tools.find(t => t.id === formData.toolId);
     if (!tool) {
@@ -128,55 +128,53 @@ export default function Tools() {
 
     // Create the new issue
     const newIssue = {
-      id: `TLI-${String(toolIssues.length + 1).padStart(3, '0')}`,
       toolId: formData.toolId,
       toolName: tool.name,
       qty: parseInt(formData.qty),
       issuedTo: formData.issuedTo,
       projectId: formData.projectId,
       issueDate: formData.issueDate,
-      expectedReturnDate: formData.expectedReturnDate,
-      status: 'Issued'
+      expectedReturnDate: formData.expectedReturnDate
     };
 
-    // Update tool stock (decrement availableQty)
-    const updatedTools = tools.map(t => 
-      t.id === formData.toolId ? { ...t, availableQty: t.availableQty - parseInt(formData.qty) } : t
-    );
-    setTools(updatedTools);
-    setToolIssues([newIssue, ...toolIssues]);
+    const success = await addToolIssue(newIssue);
+    if (success) {
+      // Update tool stock (decrement availableQty)
+      await updateTool(formData.toolId, {
+        availableQty: tool.availableQty - parseInt(formData.qty)
+      });
 
-    toast.success(`${tool.name} issued successfully!`);
-    setShowIssueForm(false);
-    
-    // Reset form
-    setFormData({
-      toolId: '',
-      qty: 1,
-      issuedTo: '',
-      projectId: '',
-      issueDate: format(new Date(), 'yyyy-MM-dd'),
-      expectedReturnDate: '',
-    });
+      toast.success(`${tool.name} issued successfully!`);
+      setShowIssueForm(false);
+      
+      // Reset form
+      setFormData({
+        toolId: '',
+        qty: 1,
+        issuedTo: '',
+        projectId: '',
+        issueDate: format(new Date(), 'yyyy-MM-dd'),
+        expectedReturnDate: '',
+      });
+    }
   };
 
-  const handleReturnTool = (issueId) => {
-    const issue = toolIssues.find(i => i.id === issueId);
+  const handleReturnTool = async (issueId) => {
+    const issue = toolIssues.find(i => i.id === issueId || i._id === issueId);
     if (!issue) return;
+    const tool = tools.find(t => t.id === issue.toolId);
+    if (!tool) return;
 
     // Update status to 'Returned'
-    const updatedIssues = toolIssues.map(i => 
-      i.id === issueId ? { ...i, status: 'Returned' } : i
-    );
-    setToolIssues(updatedIssues);
-
-    // Update tool stock (increment availableQty)
-    const updatedTools = tools.map(t => 
-      t.id === issue.toolId ? { ...t, availableQty: t.availableQty + issue.qty } : t
-    );
-    setTools(updatedTools);
-
-    toast.success("Tool marked as Returned. Stock updated!");
+    const dbId = issue._id || issue.id;
+    const success = await updateToolIssue(dbId, { status: 'Returned' });
+    if (success) {
+      // Update tool stock (increment availableQty)
+      await updateTool(tool.id, {
+        availableQty: tool.availableQty + issue.qty
+      });
+      toast.success("Tool marked as Returned. Stock updated!");
+    }
   };
 
   return (

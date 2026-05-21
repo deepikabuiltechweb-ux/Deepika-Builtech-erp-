@@ -14,39 +14,13 @@ export const AppProvider = ({ children }) => {
   const [materials, setMaterials] = useState([]);
   const [projects, setProjects] = useState([]);
   const [vendors, setVendors] = useState([]);
-  const [enquiries, setEnquiries] = useState(() => JSON.parse(localStorage.getItem('erp_enquiries')) || []);
-  const [quotations, setQuotations] = useState(() => JSON.parse(localStorage.getItem('erp_quotations')) || []);
-  const [purchaseOrders, setPurchaseOrders] = useState(() => JSON.parse(localStorage.getItem('erp_pos')) || []);
-  const [grns, setGrns] = useState(() => JSON.parse(localStorage.getItem('erp_grns')) || []);
-  const [issues, setIssues] = useState(() => JSON.parse(localStorage.getItem('erp_issues')) || []);
-  const [toolIssues, setToolIssues] = useState(() => {
-    try {
-      const local = localStorage.getItem('erp_tool_issues');
-      if (local) {
-        const parsed = JSON.parse(local);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(issue => !['TOL001', 'TOL002', 'TOL003', 'TOL004', 'TOL005'].includes(issue.toolId));
-        }
-      }
-    } catch (e) {
-      console.error("Error parsing tool issues", e);
-    }
-    return [];
-  });
-  const [tools, setTools] = useState(() => {
-    const localTools = localStorage.getItem('erp_tools');
-    if (localTools) {
-      try {
-        const parsed = JSON.parse(localTools);
-        if (parsed && Array.isArray(parsed)) {
-          return parsed.filter(t => !['TOL001', 'TOL002', 'TOL003', 'TOL004', 'TOL005'].includes(t.id));
-        }
-      } catch (e) {
-        console.error("Error parsing tools", e);
-      }
-    }
-    return [];
-  });
+  const [enquiries, setEnquiries] = useState([]);
+  const [quotations, setQuotations] = useState([]);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [grns, setGrns] = useState([]);
+  const [issues, setIssues] = useState([]);
+  const [toolIssues, setToolIssues] = useState([]);
+  const [tools, setTools] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -84,6 +58,13 @@ export const AppProvider = ({ children }) => {
     setMaterials([]);
     setProjects([]);
     setVendors([]);
+    setEnquiries([]);
+    setQuotations([]);
+    setPurchaseOrders([]);
+    setGrns([]);
+    setIssues([]);
+    setTools([]);
+    setToolIssues([]);
     toast.success("Logged out successfully");
   };
 
@@ -96,15 +77,29 @@ export const AppProvider = ({ children }) => {
     }
 
     try {
-      const [mats, projs, vends] = await Promise.all([
+      const [mats, projs, vends, enqs, quts, pos, grnList, issList, toolList, toolIssList] = await Promise.all([
         axios.get(`${API_BASE_URL}/materials`),
         axios.get(`${API_BASE_URL}/projects`),
-        axios.get(`${API_BASE_URL}/vendors`)
+        axios.get(`${API_BASE_URL}/vendors`),
+        axios.get(`${API_BASE_URL}/enquiries`),
+        axios.get(`${API_BASE_URL}/quotations`),
+        axios.get(`${API_BASE_URL}/purchaseorders`),
+        axios.get(`${API_BASE_URL}/grns`),
+        axios.get(`${API_BASE_URL}/issues`),
+        axios.get(`${API_BASE_URL}/tools`),
+        axios.get(`${API_BASE_URL}/toolissues`)
       ]);
 
       setMaterials(mats.data.data || mats.data);
       setProjects(projs.data.data || projs.data);
       setVendors(vends.data.data || vends.data);
+      setEnquiries(enqs.data.data || enqs.data);
+      setQuotations(quts.data.data || quts.data);
+      setPurchaseOrders(pos.data.data || pos.data);
+      setGrns(grnList.data.data || grnList.data);
+      setIssues(issList.data.data || issList.data);
+      setTools(toolList.data.data || toolList.data);
+      setToolIssues(toolIssList.data.data || toolIssList.data);
       
       setLoading(false);
     } catch (error) {
@@ -126,33 +121,6 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
-  // One-time automatic purge of mock/dummy records on localhost browser
-  useEffect(() => {
-    const hasPurged = localStorage.getItem('erp_purged_mock_v6');
-    if (!hasPurged) {
-      localStorage.removeItem('erp_enquiries');
-      localStorage.removeItem('erp_quotations');
-      localStorage.removeItem('erp_pos');
-      localStorage.removeItem('erp_grns');
-      localStorage.removeItem('erp_issues');
-      localStorage.removeItem('erp_tool_issues');
-      localStorage.removeItem('erp_tools');
-      localStorage.setItem('erp_purged_mock_v6', 'true');
-      window.location.reload();
-    }
-  }, []);
-
-  // Save local data on change
-  useEffect(() => {
-    localStorage.setItem('erp_enquiries', JSON.stringify(enquiries));
-    localStorage.setItem('erp_quotations', JSON.stringify(quotations));
-    localStorage.setItem('erp_pos', JSON.stringify(purchaseOrders));
-    localStorage.setItem('erp_grns', JSON.stringify(grns));
-    localStorage.setItem('erp_issues', JSON.stringify(issues));
-    localStorage.setItem('erp_tools', JSON.stringify(tools));
-    localStorage.setItem('erp_tool_issues', JSON.stringify(toolIssues));
-  }, [enquiries, quotations, purchaseOrders, grns, issues, tools, toolIssues]);
-
   // --- Material Master Functions ---
   const addMaterial = async (material) => {
     try {
@@ -165,7 +133,7 @@ export const AppProvider = ({ children }) => {
       const response = await axios.post(`${API_BASE_URL}/materials`, newMaterial);
       setMaterials([...materials, response.data.data || response.data]);
       toast.success("Material added successfully");
-      return response.data;
+      return response.data.data || response.data;
     } catch (error) {
       toast.error(error.response?.data?.message || "Error adding material");
       return false;
@@ -176,20 +144,20 @@ export const AppProvider = ({ children }) => {
     try {
       await axios.post(`${API_BASE_URL}/grn`, { items: grnItems });
       const mats = await axios.get(`${API_BASE_URL}/materials`);
-      setMaterials(mats.data);
+      setMaterials(mats.data.data || mats.data);
     } catch (error) {
       toast.error("Failed to update stock on backend");
     }
   };
 
-  const deductStockOnIssue = (issueItems) => {
-    setMaterials(prev => prev.map(mat => {
-      const issued = issueItems.find(item => item.materialId === mat.id);
-      if (issued) {
-        return { ...mat, currentStock: mat.currentStock - issued.qty };
-      }
-      return mat;
-    }));
+  const deductStockOnIssue = async (issueItems) => {
+    try {
+      await axios.post(`${API_BASE_URL}/issue`, { items: issueItems });
+      const mats = await axios.get(`${API_BASE_URL}/materials`);
+      setMaterials(mats.data.data || mats.data);
+    } catch (error) {
+      toast.error("Failed to update stock on backend");
+    }
   };
 
   // --- Vendor Functions ---
@@ -204,7 +172,7 @@ export const AppProvider = ({ children }) => {
       const response = await axios.post(`${API_BASE_URL}/vendors`, newVendor);
       setVendors([...vendors, response.data.data || response.data]);
       toast.success("Vendor added successfully");
-      return response.data;
+      return response.data.data || response.data;
     } catch (error) {
       toast.error(error.response?.data?.message || "Error adding vendor");
       return false;
@@ -223,7 +191,7 @@ export const AppProvider = ({ children }) => {
       const response = await axios.post(`${API_BASE_URL}/projects`, newProject);
       setProjects([...projects, response.data.data || response.data]);
       toast.success("Project added successfully");
-      return response.data;
+      return response.data.data || response.data;
     } catch (error) {
       toast.error(error.response?.data?.message || "Error adding project");
       return false;
@@ -277,32 +245,29 @@ export const AppProvider = ({ children }) => {
 
   const deleteMaterial = async (id) => {
     try {
-      console.log(`[FRONTEND] Attempting to delete material with ID: ${id}`);
-      const response = await axios.delete(`${API_BASE_URL}/materials/${id}`);
-      console.log("[FRONTEND] Delete response:", response.data);
+      const existing = materials.find(m => m.id === id || m._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/materials/${dbId}`);
       setMaterials(prev => prev.filter(m => String(m.id) !== String(id) && String(m._id) !== String(id)));
       toast.success("Material deleted successfully");
       return true;
     } catch (error) {
-      console.error("[FRONTEND] Delete Material Error Full Object:", error);
-      if (error.response) {
-        console.error("[FRONTEND] Error Response Data:", error.response.data);
-        console.error("[FRONTEND] Error Response Status:", error.response.status);
-      }
-      toast.error(error.response?.data?.message || "Error deleting material - Check console");
+      toast.error(error.response?.data?.message || "Error deleting material");
       return false;
     }
   };
 
   const deleteVendor = async (id) => {
     try {
-      console.log(`[FRONTEND] Attempting to delete vendor with ID: ${id}`);
-      const response = await axios.delete(`${API_BASE_URL}/vendors/${id}`);
+      const existing = vendors.find(v => v.id === id || v._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/vendors/${dbId}`);
       setVendors(prev => prev.filter(v => String(v.id) !== String(id) && String(v._id) !== String(id)));
       toast.success("Vendor deleted successfully");
       return true;
     } catch (error) {
-      console.error("[FRONTEND] Delete Vendor Error:", error.response || error);
       toast.error(error.response?.data?.message || "Error deleting vendor");
       return false;
     }
@@ -310,90 +275,367 @@ export const AppProvider = ({ children }) => {
 
   const deleteProject = async (id) => {
     try {
-      console.log(`[FRONTEND] Attempting to delete project with ID: ${id}`);
-      const response = await axios.delete(`${API_BASE_URL}/projects/${id}`);
+      const existing = projects.find(p => p.id === id || p._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/projects/${dbId}`);
       setProjects(prev => prev.filter(p => String(p.id) !== String(id) && String(p._id) !== String(id)));
       toast.success("Project deleted successfully");
       return true;
     } catch (error) {
-      console.error("[FRONTEND] Delete Project Error:", error.response || error);
       toast.error(error.response?.data?.message || "Error deleting project");
       return false;
     }
   };
 
-  const deleteEnquiry = (id) => {
-    setEnquiries(prev => prev.filter(e => e.id !== id));
-    toast.success("Enquiry deleted successfully");
+  // --- Enquiry Functions ---
+  const addEnquiry = async (enquiry) => {
+    try {
+      const maxIdNum = enquiries.reduce((max, e) => {
+        const num = parseInt(e.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const enqId = `ENQ-${String(maxIdNum + 1).padStart(3, '0')}`;
+      const newEnq = { ...enquiry, id: enqId, date: new Date().toISOString(), status: 'Open' };
+      const response = await axios.post(`${API_BASE_URL}/enquiries`, newEnq);
+      setEnquiries(prev => [...prev, response.data.data || response.data]);
+      toast.success("Enquiry created successfully!");
+      return response.data.data || response.data;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to create enquiry");
+      return false;
+    }
   };
 
-  const deleteQuotation = (id) => {
-    setQuotations(prev => prev.filter(q => q.id !== id));
-    toast.success("Quotation deleted successfully");
+  const updateEnquiry = async (id, updatedFields) => {
+    try {
+      const existing = enquiries.find(e => e.id === id || e._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      const response = await axios.put(`${API_BASE_URL}/enquiries/${dbId}`, { ...existing, ...updatedFields });
+      setEnquiries(prev => prev.map(e => (e.id === id || e._id === id) ? (response.data.data || response.data) : e));
+      return response.data.data || response.data;
+    } catch (e) {
+      console.error("Error updating enquiry", e);
+    }
   };
 
-  const deletePurchaseOrder = (id) => {
-    setPurchaseOrders(prev => prev.filter(p => p.id !== id));
-    toast.success("Purchase Order deleted successfully");
+  const deleteEnquiry = async (id) => {
+    try {
+      const existing = enquiries.find(e => e.id === id || e._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/enquiries/${dbId}`);
+      setEnquiries(prev => prev.filter(e => e.id !== id && e._id !== id));
+      toast.success("Enquiry deleted successfully");
+      return true;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to delete enquiry");
+      return false;
+    }
   };
 
-  const deleteGRN = (id) => {
-    setGrns(prev => prev.filter(g => g.id !== id));
-    toast.success("GRN deleted successfully");
+  // --- Quotation Functions ---
+  const addQuotation = async (quotation) => {
+    try {
+      const maxIdNum = quotations.reduce((max, q) => {
+        const num = parseInt(q.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const quoteId = `QUO-${String(maxIdNum + 1).padStart(3, '0')}`;
+      const newQuote = { ...quotation, id: quoteId };
+      const response = await axios.post(`${API_BASE_URL}/quotations`, newQuote);
+      setQuotations(prev => [...prev, response.data.data || response.data]);
+      toast.success("Quotation recorded successfully!");
+      return response.data.data || response.data;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to record quotation");
+      return false;
+    }
   };
 
-  const deleteIssue = (id) => {
-    setIssues(prev => prev.filter(i => i.id !== id));
-    toast.success("Material Issue deleted successfully");
+  const updateQuotation = async (id, updatedFields) => {
+    try {
+      const existing = quotations.find(q => q.id === id || q._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      const response = await axios.put(`${API_BASE_URL}/quotations/${dbId}`, { ...existing, ...updatedFields });
+      setQuotations(prev => prev.map(q => (q.id === id || q._id === id) ? (response.data.data || response.data) : q));
+      return response.data.data || response.data;
+    } catch (e) {
+      console.error("Error updating quotation", e);
+    }
   };
 
-  const addTool = (tool) => {
-    const maxIdNum = tools.reduce((max, t) => {
-      const num = parseInt(t.id?.replace(/\D/g, '') || 0);
-      return num > max ? num : max;
-    }, 0);
-    const toolId = `TOL${String(maxIdNum + 1).padStart(3, '0')}`;
-    const total = parseInt(tool.totalQty) || 0;
-    const repair = parseInt(tool.repairQty) || 0;
-    const available = total - repair;
-    
-    const newTool = {
-      id: toolId,
-      name: tool.name,
-      category: tool.category,
-      totalQty: total,
-      availableQty: available,
-      repairQty: repair
-    };
-    setTools(prev => [...prev, newTool]);
-    toast.success("Tool registered successfully");
-    return newTool;
+  const deleteQuotation = async (id) => {
+    try {
+      const existing = quotations.find(q => q.id === id || q._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/quotations/${dbId}`);
+      setQuotations(prev => prev.filter(q => q.id !== id && q._id !== id));
+      toast.success("Quotation deleted successfully");
+      return true;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to delete quotation");
+      return false;
+    }
   };
 
-  const updateTool = (id, updatedTool) => {
-    setTools(prev => prev.map(t => {
-      if (t.id === id) {
-        const total = parseInt(updatedTool.totalQty) || 0;
-        const repair = parseInt(updatedTool.repairQty) || 0;
-        const issued = t.totalQty - t.availableQty - t.repairQty;
-        const available = total - repair - issued;
-        return {
-          ...t,
-          name: updatedTool.name,
-          category: updatedTool.category,
-          totalQty: total,
-          availableQty: available,
-          repairQty: repair
-        };
-      }
-      return t;
-    }));
-    toast.success("Tool updated successfully");
+  // --- Purchase Order Functions ---
+  const addPurchaseOrder = async (po) => {
+    try {
+      const maxIdNum = purchaseOrders.reduce((max, p) => {
+        const num = parseInt(p.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const poId = `PO-2024-${String(maxIdNum + 1).padStart(3, '0')}`;
+      const newPO = { ...po, id: poId };
+      const response = await axios.post(`${API_BASE_URL}/purchaseorders`, newPO);
+      setPurchaseOrders(prev => [...prev, response.data.data || response.data]);
+      toast.success(`PO ${poId} generated successfully!`);
+      return response.data.data || response.data;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to generate Purchase Order");
+      return false;
+    }
   };
 
-  const deleteTool = (id) => {
-    setTools(prev => prev.filter(t => t.id !== id));
-    toast.success("Tool deleted successfully");
+  const updatePurchaseOrder = async (id, updatedFields) => {
+    try {
+      const existing = purchaseOrders.find(p => p.id === id || p._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      const response = await axios.put(`${API_BASE_URL}/purchaseorders/${dbId}`, { ...existing, ...updatedFields });
+      setPurchaseOrders(prev => prev.map(p => (p.id === id || p._id === id) ? (response.data.data || response.data) : p));
+      return response.data.data || response.data;
+    } catch (e) {
+      console.error("Error updating Purchase Order", e);
+    }
+  };
+
+  const deletePurchaseOrder = async (id) => {
+    try {
+      const existing = purchaseOrders.find(p => p.id === id || p._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/purchaseorders/${dbId}`);
+      setPurchaseOrders(prev => prev.filter(p => p.id !== id && p._id !== id));
+      toast.success("Purchase Order deleted successfully");
+      return true;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to delete Purchase Order");
+      return false;
+    }
+  };
+
+  // --- GRN Functions ---
+  const addGRN = async (grn) => {
+    try {
+      const maxIdNum = grns.reduce((max, g) => {
+        const num = parseInt(g.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const grnId = `GRN-2024-${String(maxIdNum + 1).padStart(3, '0')}`;
+      const newGRN = { ...grn, id: grnId };
+      const response = await axios.post(`${API_BASE_URL}/grns`, newGRN);
+      setGrns(prev => [...prev, response.data.data || response.data]);
+      toast.success("GRN registered successfully!");
+      return response.data.data || response.data;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to record GRN");
+      return false;
+    }
+  };
+
+  const updateGRN = async (id, updatedFields) => {
+    try {
+      const existing = grns.find(g => g.id === id || g._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      const response = await axios.put(`${API_BASE_URL}/grns/${dbId}`, { ...existing, ...updatedFields });
+      setGrns(prev => prev.map(g => (g.id === id || g._id === id) ? (response.data.data || response.data) : g));
+      return response.data.data || response.data;
+    } catch (e) {
+      console.error("Error updating GRN", e);
+    }
+  };
+
+  const deleteGRN = async (id) => {
+    try {
+      const existing = grns.find(g => g.id === id || g._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/grns/${dbId}`);
+      setGrns(prev => prev.filter(g => g.id !== id && g._id !== id));
+      toast.success("GRN record deleted");
+      return true;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to delete GRN");
+      return false;
+    }
+  };
+
+  // --- Material Issue Functions ---
+  const addIssue = async (issue) => {
+    try {
+      const maxIdNum = issues.reduce((max, i) => {
+        const num = parseInt(i.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const issueId = `ISS-2024-${String(maxIdNum + 1).padStart(3, '0')}`;
+      const newIssue = { ...issue, id: issueId };
+      const response = await axios.post(`${API_BASE_URL}/issues`, newIssue);
+      setIssues(prev => [...prev, response.data.data || response.data]);
+      toast.success("Material issued successfully!");
+      return response.data.data || response.data;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to issue material");
+      return false;
+    }
+  };
+
+  const updateIssue = async (id, updatedFields) => {
+    try {
+      const existing = issues.find(i => i.id === id || i._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      const response = await axios.put(`${API_BASE_URL}/issues/${dbId}`, { ...existing, ...updatedFields });
+      setIssues(prev => prev.map(i => (i.id === id || i._id === id) ? (response.data.data || response.data) : i));
+      return response.data.data || response.data;
+    } catch (e) {
+      console.error("Error updating issue record", e);
+    }
+  };
+
+  const deleteIssue = async (id) => {
+    try {
+      const existing = issues.find(i => i.id === id || i._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/issues/${dbId}`);
+      setIssues(prev => prev.filter(i => i.id !== id && i._id !== id));
+      toast.success("Material Issue record deleted");
+      return true;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to delete issue");
+      return false;
+    }
+  };
+
+  // --- Tool Functions ---
+  const addTool = async (tool) => {
+    try {
+      const maxIdNum = tools.reduce((max, t) => {
+        const num = parseInt(t.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const toolId = `TOL${String(maxIdNum + 1).padStart(3, '0')}`;
+      const total = parseInt(tool.totalQty) || 0;
+      const repair = parseInt(tool.repairQty) || 0;
+      const available = total - repair;
+      const newTool = {
+        id: toolId,
+        name: tool.name,
+        category: tool.category,
+        totalQty: total,
+        availableQty: available,
+        repairQty: repair
+      };
+      const response = await axios.post(`${API_BASE_URL}/tools`, newTool);
+      setTools(prev => [...prev, response.data.data || response.data]);
+      toast.success("Tool registered successfully");
+      return response.data.data || response.data;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to register tool");
+      return false;
+    }
+  };
+
+  const updateTool = async (id, updatedTool) => {
+    try {
+      const existing = tools.find(t => t.id === id || t._id === id);
+      if (!existing) return;
+      
+      const total = parseInt(updatedTool.totalQty !== undefined ? updatedTool.totalQty : existing.totalQty) || 0;
+      const repair = parseInt(updatedTool.repairQty !== undefined ? updatedTool.repairQty : existing.repairQty) || 0;
+      const issued = existing.totalQty - existing.availableQty - existing.repairQty;
+      const available = total - repair - (updatedTool.availableQty !== undefined ? 0 : issued);
+      
+      const toSend = {
+        ...existing,
+        ...updatedTool,
+        totalQty: total,
+        repairQty: repair,
+        availableQty: updatedTool.availableQty !== undefined ? updatedTool.availableQty : available
+      };
+      
+      const dbId = existing._id || existing.id;
+      const response = await axios.put(`${API_BASE_URL}/tools/${dbId}`, toSend);
+      setTools(prev => prev.map(t => (t.id === id || t._id === id) ? (response.data.data || response.data) : t));
+      return response.data.data || response.data;
+    } catch (e) {
+      console.error("Failed to update tool", e);
+    }
+  };
+
+  const deleteTool = async (id) => {
+    try {
+      const existing = tools.find(t => t.id === id || t._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/tools/${dbId}`);
+      setTools(prev => prev.filter(t => t.id !== id && t._id !== id));
+      toast.success("Tool deleted successfully");
+      return true;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to delete tool");
+      return false;
+    }
+  };
+
+  // --- Tool Issue Functions ---
+  const addToolIssue = async (toolIssue) => {
+    try {
+      const maxIdNum = toolIssues.reduce((max, t) => {
+        const num = parseInt(t.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const issueId = `TLI-${String(maxIdNum + 1).padStart(3, '0')}`;
+      const newIssue = { ...toolIssue, id: issueId, status: 'Issued' };
+      const response = await axios.post(`${API_BASE_URL}/toolissues`, newIssue);
+      setToolIssues(prev => [response.data.data || response.data, ...prev]);
+      return response.data.data || response.data;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to issue tool");
+      return false;
+    }
+  };
+
+  const updateToolIssue = async (id, updatedFields) => {
+    try {
+      const existing = toolIssues.find(i => i.id === id || i._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      const response = await axios.put(`${API_BASE_URL}/toolissues/${dbId}`, { ...existing, ...updatedFields });
+      setToolIssues(prev => prev.map(i => (i.id === id || i._id === id) ? (response.data.data || response.data) : i));
+      return response.data.data || response.data;
+    } catch (e) {
+      console.error("Failed to update tool issue log", e);
+    }
+  };
+
+  const deleteToolIssue = async (id) => {
+    try {
+      const existing = toolIssues.find(i => i.id === id || i._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/toolissues/${dbId}`);
+      setToolIssues(prev => prev.filter(i => i.id !== id && i._id !== id));
+      return true;
+    } catch (e) {
+      console.error("Failed to delete tool issue log", e);
+    }
   };
 
   return (
@@ -402,12 +644,13 @@ export const AppProvider = ({ children }) => {
       materials, setMaterials, addMaterial, updateMaterial, deleteMaterial,
       projects, setProjects, addProject, updateProject, deleteProject,
       vendors, setVendors, addVendor, updateVendor, deleteVendor,
-      enquiries, setEnquiries, deleteEnquiry,
-      quotations, setQuotations, deleteQuotation,
-      purchaseOrders, setPurchaseOrders, deletePurchaseOrder,
-      grns, setGrns, updateStockOnGRN, deleteGRN,
-      issues, setIssues, deductStockOnIssue, deleteIssue,
-      tools, setTools, addTool, updateTool, deleteTool, toolIssues, setToolIssues,
+      enquiries, setEnquiries, addEnquiry, updateEnquiry, deleteEnquiry,
+      quotations, setQuotations, addQuotation, updateQuotation, deleteQuotation,
+      purchaseOrders, setPurchaseOrders, addPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder,
+      grns, setGrns, addGRN, updateGRN, deleteGRN, updateStockOnGRN,
+      issues, setIssues, addIssue, updateIssue, deleteIssue, deductStockOnIssue,
+      tools, setTools, addTool, updateTool, deleteTool,
+      toolIssues, setToolIssues, addToolIssue, updateToolIssue, deleteToolIssue,
       loading,
       isAdmin: user?.role === 'admin',
       isStoreTeam: user?.role === 'store_team' || user?.role === 'admin',

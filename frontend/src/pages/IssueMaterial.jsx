@@ -12,7 +12,7 @@ function cn(...inputs) {
 }
 
 export default function IssueMaterial() {
-  const { materials, projects, issues, setIssues, deleteIssue, deductStockOnIssue, isAdmin, addProject, purchaseOrders } = useApp();
+  const { materials, projects, issues, addIssue, deleteIssue, deductStockOnIssue, isAdmin, addProject, purchaseOrders } = useApp();
   const [showForm, setShowForm] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -58,7 +58,7 @@ export default function IssueMaterial() {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validate Purchase Order
@@ -75,24 +75,23 @@ export default function IssueMaterial() {
     }
 
     const newIssue = {
-      id: `ISS-2024-${String(issues.length + 1).padStart(3, '0')}`,
       ...formData,
       totalCost: formData.items.reduce((acc, i) => acc + (i.qty * i.rate), 0)
     };
 
-    setIssues([...issues, newIssue]);
-    deductStockOnIssue(formData.items);
-    
-    toast.success("Material issued successfully!");
-    setShowForm(false);
-    setFormData({
-      issueDate: format(new Date(), 'yyyy-MM-dd'),
-      projectId: '',
-      workOrderNo: '',
-      issuedTo: '',
-      purpose: '',
-      items: [{ id: Date.now(), materialId: '', name: '', qty: 0, available: 0, unit: '', rate: 0 }]
-    });
+    const success = await addIssue(newIssue);
+    if (success) {
+      await deductStockOnIssue(formData.items);
+      setShowForm(false);
+      setFormData({
+        issueDate: format(new Date(), 'yyyy-MM-dd'),
+        projectId: '',
+        workOrderNo: '',
+        issuedTo: '',
+        purpose: '',
+        items: [{ id: Date.now(), materialId: '', name: '', qty: 0, available: 0, unit: '', rate: 0 }]
+      });
+    }
   };
 
   return (
