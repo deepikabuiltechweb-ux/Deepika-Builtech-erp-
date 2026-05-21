@@ -124,16 +124,23 @@ export const AppProvider = ({ children }) => {
   // --- Material Master Functions ---
   const addMaterial = async (material) => {
     try {
-      const maxIdNum = materials.reduce((max, m) => {
-        const num = parseInt(m.id?.replace(/\D/g, '') || 0);
-        return num > max ? num : max;
-      }, 0);
-      const materialId = `MAT${String(maxIdNum + 1).padStart(3, '0')}`;
-      const newMaterial = { ...material, id: materialId };
-      const response = await axios.post(`${API_BASE_URL}/materials`, newMaterial);
-      setMaterials([...materials, response.data.data || response.data]);
+      const response = await axios.post(`${API_BASE_URL}/materials`, material);
+      const savedMaterial = response.data.data || response.data;
+      
+      // Fallback in case backend pre-validate hook didn't set id (unlikely)
+      if (!savedMaterial.id) {
+        const maxIdNum = materials.reduce((max, m) => {
+          const num = parseInt(m.id?.replace(/\D/g, '') || 0);
+          return num > max ? num : max;
+        }, 0);
+        const materialId = `MAT${String(maxIdNum + 1).padStart(3, '0')}`;
+        savedMaterial.id = materialId;
+        await axios.put(`${API_BASE_URL}/materials/${savedMaterial._id || savedMaterial.id}`, { id: materialId });
+      }
+
+      setMaterials([...materials, savedMaterial]);
       toast.success("Material added successfully");
-      return response.data.data || response.data;
+      return savedMaterial;
     } catch (error) {
       toast.error(error.response?.data?.message || "Error adding material");
       return false;

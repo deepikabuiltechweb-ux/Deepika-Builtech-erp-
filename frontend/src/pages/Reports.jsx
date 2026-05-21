@@ -116,10 +116,86 @@ export default function Reports() {
     return 'purchase';
   });
 
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const isWithinDateRange = (dateStr) => {
+    if (!dateStr) return true;
+    const dateVal = new Date(dateStr);
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0,0,0,0);
+      if (dateVal < start) return false;
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23,59,59,999);
+      if (dateVal > end) return false;
+    }
+    return true;
+  };
+
+  const matchesSearch = (item, fields) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase().trim();
+    return fields.some(field => {
+      const value = typeof field === 'function' ? field(item) : item[field];
+      return String(value || '').toLowerCase().includes(query);
+    });
+  };
+
+  const filteredPurchaseOrders = purchaseOrders.filter(po => {
+    const vendorName = vendors.find(v => v.id === po.vendorId)?.name || 'N/A';
+    const projectName = projects.find(p => p.id === po.projectId)?.name || 'N/A';
+    return isWithinDateRange(po.date) && matchesSearch(po, [
+      'id', 'status', () => vendorName, () => projectName
+    ]);
+  });
+
+  const filteredQuotations = getQuotationsData().filter(q => {
+    const origQuote = quotations.find(oq => oq.id === q.id);
+    return isWithinDateRange(origQuote?.quoteDate) && matchesSearch(q, [
+      'id', 'enqId', 'vendorName', 'project', 'status'
+    ]);
+  });
+
+  const filteredGRNs = grns.filter(g => {
+    return isWithinDateRange(g.grnDate) && matchesSearch(g, [
+      'id', 'poRef', 'vendorName', 'vehicleNo'
+    ]);
+  });
+
+  const filteredMaterials = materials.filter(m => {
+    return matchesSearch(m, [
+      'id', 'name', 'category', 'brand'
+    ]);
+  });
+
+  const filteredIssues = issues.filter(i => {
+    const projectName = projects.find(p => p.id === i.projectId)?.name || 'N/A';
+    return isWithinDateRange(i.issueDate) && matchesSearch(i, [
+      'id', 'issuedTo', 'purpose', () => projectName
+    ]);
+  });
+
+  const filteredToolIssues = getToolIssuesData().filter(t => {
+    const origToolIssue = toolIssues.find(oti => oti.id === t.id);
+    return isWithinDateRange(origToolIssue?.issueDate) && matchesSearch(t, [
+      'id', 'toolName', 'issuedTo', 'project', 'status'
+    ]);
+  });
+
+  const filteredFinancialData = getFinancialData().filter(f => {
+    return matchesSearch(f, [
+      'vendorName', 'category'
+    ]);
+  });
+
   const getActiveReportData = () => {
     switch (activeReport) {
       case 'purchase':
-        return purchaseOrders.map(po => ({
+        return filteredPurchaseOrders.map(po => ({
           'PO No': po.id,
           'Date': format(new Date(po.date), 'dd-MM-yyyy'),
           'Vendor': vendors.find(v => v.id === po.vendorId)?.name || 'N/A',
@@ -128,7 +204,7 @@ export default function Reports() {
           'Status': po.status
         }));
       case 'quotations':
-        return getQuotationsData().map(q => ({
+        return filteredQuotations.map(q => ({
           'Quotation ID': q.id,
           'Enquiry Ref': q.enqId,
           'Vendor': q.vendorName,
@@ -138,7 +214,7 @@ export default function Reports() {
           'Status': q.status
         }));
       case 'grn':
-        return grns.map(g => ({
+        return filteredGRNs.map(g => ({
           'GRN No': g.id,
           'Date': format(new Date(g.grnDate), 'dd-MM-yyyy'),
           'PO Ref': g.poRef,
@@ -147,7 +223,7 @@ export default function Reports() {
           'Items Count': g.items.length
         }));
       case 'stock':
-        return materials.map(m => {
+        return filteredMaterials.map(m => {
           const row = {
             'Material ID': m.id,
             'Material Name': m.name,
@@ -162,7 +238,7 @@ export default function Reports() {
           return row;
         });
       case 'issue':
-        return issues.map(i => {
+        return filteredIssues.map(i => {
           const row = {
             'Issue No': i.id,
             'Date': format(new Date(i.issueDate), 'dd-MM-yyyy'),
@@ -178,7 +254,7 @@ export default function Reports() {
           return row;
         });
       case 'tool_issue':
-        return getToolIssuesData().map(t => ({
+        return filteredToolIssues.map(t => ({
           'Issue ID': t.id,
           'Tool Name': t.toolName,
           'Issued To': t.issuedTo,
@@ -188,7 +264,7 @@ export default function Reports() {
           'Status': t.status
         }));
       case 'financial':
-        return getFinancialData().map(f => ({
+        return filteredFinancialData.map(f => ({
           'Vendor Name': f.vendorName,
           'Category': f.category,
           'Total Orders': f.totalOrders,
@@ -230,12 +306,12 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {purchaseOrders.length === 0 ? (
+              {filteredPurchaseOrders.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="text-center p-8 text-text-gray italic">No purchase orders found.</td>
                 </tr>
               ) : (
-                purchaseOrders.map(po => (
+                filteredPurchaseOrders.map(po => (
                   <tr key={po.id}>
                     <td>{format(new Date(po.date), 'dd-MM-yyyy')}</td>
                     <td className="font-bold text-primary">{po.id}</td>
@@ -250,7 +326,6 @@ export default function Reports() {
           </table>
         );
       case 'quotations':
-        const qData = getQuotationsData();
         return (
           <table className="erp-table animate-in fade-in duration-200">
             <thead>
@@ -265,12 +340,12 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {qData.length === 0 ? (
+              {filteredQuotations.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="text-center p-8 text-text-gray italic">No quotations found.</td>
                 </tr>
               ) : (
-                qData.map(q => (
+                filteredQuotations.map(q => (
                   <tr key={q.id}>
                     <td className="font-bold text-primary">{q.id}</td>
                     <td className="font-medium text-text-dark">{q.enqId}</td>
@@ -306,12 +381,12 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {grns.length === 0 ? (
+              {filteredGRNs.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="text-center p-8 text-text-gray italic">No GRNs recorded yet.</td>
                 </tr>
               ) : (
-                grns.map(g => (
+                filteredGRNs.map(g => (
                   <tr key={g.id}>
                     <td>{format(new Date(g.grnDate), 'dd-MM-yyyy')}</td>
                     <td className="font-bold text-primary">{g.id}</td>
@@ -339,7 +414,12 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {materials.map(m => (
+              {filteredMaterials.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="text-center p-8 text-text-gray italic">No materials found.</td>
+                </tr>
+              ) : (
+                filteredMaterials.map(m => (
                 <tr key={m.id}>
                   <td className="font-bold">{m.name}</td>
                   <td>{m.category}</td>
@@ -348,7 +428,8 @@ export default function Reports() {
                   {!isPureStore && <td className="text-right">₹{m.latestPrice.toLocaleString()}</td>}
                   {!isPureStore && <td className="text-right font-bold text-primary">₹{(m.currentStock * m.latestPrice).toLocaleString()}</td>}
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         );
@@ -367,12 +448,12 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {issues.length === 0 ? (
+              {filteredIssues.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="text-center p-8 text-text-gray italic">No materials issued yet.</td>
                 </tr>
               ) : (
-                issues.map(i => (
+                filteredIssues.map(i => (
                   <tr key={i.id}>
                     <td>{format(new Date(i.issueDate), 'dd-MM-yyyy')}</td>
                     <td className="font-bold text-primary">{i.id}</td>
@@ -388,7 +469,6 @@ export default function Reports() {
           </table>
         );
       case 'tool_issue':
-        const tiData = getToolIssuesData();
         return (
           <table className="erp-table animate-in fade-in duration-200">
             <thead>
@@ -403,12 +483,12 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {tiData.length === 0 ? (
+              {filteredToolIssues.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="text-center p-8 text-text-gray italic">No tool issues recorded yet.</td>
                 </tr>
               ) : (
-                tiData.map(t => (
+                filteredToolIssues.map(t => (
                   <tr key={t.id}>
                     <td className="font-bold text-primary">{t.id}</td>
                     <td className="font-semibold text-text-dark">{t.toolName}</td>
@@ -431,7 +511,6 @@ export default function Reports() {
           </table>
         );
       case 'financial':
-        const fData = getFinancialData();
         return (
           <table className="erp-table animate-in fade-in duration-200">
             <thead>
@@ -446,12 +525,12 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {fData.length === 0 ? (
+              {filteredFinancialData.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="text-center p-8 text-text-gray italic">No financial transaction data found.</td>
                 </tr>
               ) : (
-                fData.map((f, idx) => (
+                filteredFinancialData.map((f, idx) => (
                   <tr key={idx}>
                     <td className="font-bold text-text-dark">{f.vendorName}</td>
                     <td>{f.category}</td>
@@ -521,19 +600,35 @@ export default function Reports() {
          </div>
 
          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-6 border-b border-border">
-            <div className="space-y-1">
+            <div className="space-y-1 md:col-span-2">
                <label className="text-xs font-bold text-text-gray uppercase">Date Range</label>
                <div className="flex items-center gap-2">
-                  <input type="date" className="input-field text-sm" />
-                  <span className="text-text-gray">to</span>
-                  <input type="date" className="input-field text-sm" />
+                  <input 
+                    type="date" 
+                    className="input-field text-sm min-w-0" 
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                  <span className="text-text-gray shrink-0">to</span>
+                  <input 
+                    type="date" 
+                    className="input-field text-sm min-w-0" 
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
                </div>
             </div>
             <div className="space-y-1">
                <label className="text-xs font-bold text-text-gray uppercase">Search / Filter</label>
                <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-gray" />
-                  <input type="text" placeholder="Filter results..." className="input-field pl-10 text-sm" />
+                  <input 
+                    type="text" 
+                    placeholder="Filter results..." 
+                    className="input-field pl-10 text-sm" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
                </div>
             </div>
          </div>

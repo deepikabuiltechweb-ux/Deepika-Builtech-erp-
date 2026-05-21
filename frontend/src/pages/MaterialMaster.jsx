@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Plus, Search, Filter, Edit2, Trash2, Download } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, Download, Info } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function MaterialMaster() {
@@ -194,6 +194,17 @@ export default function MaterialMaster() {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {!editingId && (
+                <div className="bg-primary-bg p-3 rounded-md border border-border flex items-start gap-3">
+                  <div className="bg-primary/10 text-primary p-2 rounded-full shrink-0">
+                    <Info className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-text-dark">Auto-Generated Item Code</p>
+                    <p className="text-xs text-text-gray">A sequential item code (e.g., MAT003) will be automatically generated upon saving.</p>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-text-gray mb-1">Material Name</label>
