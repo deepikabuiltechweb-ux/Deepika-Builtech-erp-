@@ -119,6 +119,22 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
+  // One-time automatic purge of mock/dummy records on localhost browser
+  useEffect(() => {
+    const hasPurged = localStorage.getItem('erp_purged_mock_v4');
+    if (!hasPurged) {
+      localStorage.removeItem('erp_enquiries');
+      localStorage.removeItem('erp_quotations');
+      localStorage.removeItem('erp_pos');
+      localStorage.removeItem('erp_grns');
+      localStorage.removeItem('erp_issues');
+      localStorage.removeItem('erp_tool_issues');
+      localStorage.removeItem('erp_tools');
+      localStorage.setItem('erp_purged_mock_v4', 'true');
+      window.location.reload();
+    }
+  }, []);
+
   // Save local data on change
   useEffect(() => {
     localStorage.setItem('erp_enquiries', JSON.stringify(enquiries));
