@@ -12,23 +12,18 @@ const materialSchema = new mongoose.Schema({
   minLevel: { type: Number, default: 0 }
 }, { timestamps: true });
 
-materialSchema.pre('validate', async function(next) {
+materialSchema.pre('validate', async function() {
   if (!this.id) {
-    try {
-      const highestMaterial = await this.constructor.findOne({ id: /^MAT\d+$/ }).sort({ id: -1 });
-      let nextNum = 1;
-      if (highestMaterial && highestMaterial.id) {
-        const match = highestMaterial.id.match(/MAT(\d+)/);
-        if (match) {
-          nextNum = parseInt(match[1], 10) + 1;
-        }
+    const highestMaterial = await this.constructor.findOne({ id: /^MAT\d+$/ }).sort({ id: -1 });
+    let nextNum = 1;
+    if (highestMaterial && highestMaterial.id) {
+      const match = highestMaterial.id.match(/MAT(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
       }
-      this.id = `MAT${String(nextNum).padStart(3, '0')}`;
-    } catch (err) {
-      return next(err);
     }
+    this.id = `MAT${String(nextNum).padStart(3, '0')}`;
   }
-  next();
 });
 
 const Material = mongoose.model('Material', materialSchema);
