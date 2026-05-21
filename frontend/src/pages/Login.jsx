@@ -166,7 +166,7 @@ export default function Login() {
                   type="email" 
                   required
                   className="input-field pl-10 py-3 text-sm focus:border-slate-400"
-                  placeholder={portal === 'store' ? "store@deepikabuiltech.com" : portal === 'purchase' ? "purchase@deepikabuiltech.com" : "viewer@deepikabuiltech.com"}
+                  placeholder="username@deepikabuiltech.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
@@ -218,13 +218,7 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Quick Info Box */}
-          <div className="mt-8 p-3.5 bg-slate-50 rounded-xl border border-slate-200/50 flex items-start gap-2.5">
-            <ClipboardList className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-            <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
-              Demo credentials: <span className="font-bold text-slate-700">store@deepikabuiltech.com</span> (store@123), <span className="font-bold text-slate-700">purchase@deepikabuiltech.com</span> (purchase@123), or <span className="font-bold text-slate-700">viewer@deepikabuiltech.com</span> (viewer@123) for read-only access.
-            </p>
-          </div>
+
         </div>
       </div>
     </div>
