@@ -103,7 +103,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
               <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
                 <Warehouse className="text-primary-dark w-6 h-6" />
               </div>
-              <span className="font-bold text-xl tracking-tight">PEB ERP</span>
+              <span className="font-bold text-xl tracking-tight">Deepika Builtech ERP</span>
             </div>
             <button onClick={toggleSidebar} className="lg:hidden text-white/70 hover:text-white">
               <X className="w-6 h-6" />
@@ -125,7 +125,17 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
                    )}
                 </div>
                 <div className="min-w-0">
-                   <p className="text-xs font-bold uppercase tracking-widest opacity-50 truncate">{user?.role} Portal</p>
+                   <p className="text-xs font-bold uppercase tracking-widest opacity-50 truncate">
+                     {user?.role === 'store_team' 
+                       ? 'Store' 
+                       : user?.role === 'purchase_team' 
+                       ? 'Purchase' 
+                       : user?.role === 'admin' 
+                       ? 'Admin' 
+                       : user?.role === 'viewer' 
+                       ? 'Viewer' 
+                       : user?.role || 'Guest'} Portal
+                   </p>
                    <p className="text-sm font-semibold truncate">{user?.name}</p>
                 </div>
              </div>

@@ -271,16 +271,20 @@ export default function StoreGRN() {
               <div className="card bg-primary-dark text-white">
                  <h3 className="font-bold mb-4 flex items-center gap-2"><Truck className="w-5 h-5" /> Pending Deliveries</h3>
                  <div className="space-y-3">
-                    {purchaseOrders.filter(p => p.status === 'Sent' || p.status === 'Partial').map(p => (
-                       <div key={p.id} className="p-3 bg-white/10 rounded-lg border border-white/10">
-                          <p className="font-bold">{p.id}</p>
-                          <p className="text-xs text-white/70">{vendors.find(v => v.id === p.vendorId)?.name}</p>
-                          <div className="mt-2 flex justify-between items-center">
-                             <span className="text-[10px] uppercase tracking-wider font-bold text-warning">{p.status}</span>
-                             <button onClick={() => { setShowEntry(true); handlePOSelect(p.id); }} className="text-[10px] bg-white text-primary px-2 py-1 rounded font-bold hover:bg-primary-bg">RECEIVE</button>
+                    {purchaseOrders.filter(p => p.status === 'Sent' || p.status === 'Partial').length === 0 ? (
+                       <p className="text-sm text-white/60 italic text-center py-4">No pending deliveries today.</p>
+                    ) : (
+                       purchaseOrders.filter(p => p.status === 'Sent' || p.status === 'Partial').map(p => (
+                          <div key={p.id} className="p-3 bg-white/10 rounded-lg border border-white/10">
+                             <p className="font-bold">{p.id}</p>
+                             <p className="text-xs text-white/70">{vendors.find(v => v.id === p.vendorId)?.name}</p>
+                             <div className="mt-2 flex justify-between items-center">
+                                <span className="text-[10px] uppercase tracking-wider font-bold text-warning">{p.status}</span>
+                                <button onClick={() => { setShowEntry(true); handlePOSelect(p.id); }} className="text-[10px] bg-white text-primary px-2 py-1 rounded font-bold hover:bg-primary-bg">RECEIVE</button>
+                             </div>
                           </div>
-                       </div>
-                    ))}
+                       ))
+                    )}
                  </div>
               </div>
               <div className="card">

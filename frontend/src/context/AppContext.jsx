@@ -19,6 +19,7 @@ export const AppProvider = ({ children }) => {
   const [purchaseOrders, setPurchaseOrders] = useState(() => JSON.parse(localStorage.getItem('erp_pos')) || []);
   const [grns, setGrns] = useState(() => JSON.parse(localStorage.getItem('erp_grns')) || []);
   const [issues, setIssues] = useState(() => JSON.parse(localStorage.getItem('erp_issues')) || []);
+  const [toolIssues, setToolIssues] = useState(() => JSON.parse(localStorage.getItem('erp_tool_issues')) || []);
   const [tools, setTools] = useState(() => {
     const localTools = localStorage.getItem('erp_tools');
     if (localTools) {
@@ -126,7 +127,8 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('erp_grns', JSON.stringify(grns));
     localStorage.setItem('erp_issues', JSON.stringify(issues));
     localStorage.setItem('erp_tools', JSON.stringify(tools));
-  }, [enquiries, quotations, purchaseOrders, grns, issues, tools]);
+    localStorage.setItem('erp_tool_issues', JSON.stringify(toolIssues));
+  }, [enquiries, quotations, purchaseOrders, grns, issues, tools, toolIssues]);
 
   // --- Material Master Functions ---
   const addMaterial = async (material) => {
@@ -338,7 +340,7 @@ export const AppProvider = ({ children }) => {
       purchaseOrders, setPurchaseOrders, deletePurchaseOrder,
       grns, setGrns, updateStockOnGRN, deleteGRN,
       issues, setIssues, deductStockOnIssue, deleteIssue,
-      tools, setTools, deleteTool,
+      tools, setTools, deleteTool, toolIssues, setToolIssues,
       loading,
       isAdmin: user?.role === 'admin',
       isStoreTeam: user?.role === 'store_team' || user?.role === 'admin',

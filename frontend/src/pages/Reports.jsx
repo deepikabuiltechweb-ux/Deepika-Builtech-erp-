@@ -11,42 +11,43 @@ function cn(...inputs) {
 }
 
 export default function Reports() {
-  const { purchaseOrders, grns, issues, materials, vendors, projects, tools, isStoreTeam, isPurchaseTeam, isAdmin } = useApp();
+  const { purchaseOrders, grns, issues, materials, vendors, projects, tools, isStoreTeam, isPurchaseTeam, isAdmin, enquiries, quotations, toolIssues } = useApp();
 
   const isPureStore = isStoreTeam && !isPurchaseTeam;
 
-  // Static high-quality mock data for Tool Issues (Store Team + Admin only)
-  const toolIssueData = [
-    { id: 'TLI-001', toolName: 'Welding Machine ARC-400', issuedTo: 'Rajesh Kumar', project: 'Deepika Residency', issueDate: '2026-05-10', expectedReturn: '2026-05-25', status: 'Issued' },
-    { id: 'TLI-002', toolName: 'Magnetic Core Drill Machine', issuedTo: 'M. Anbarasan', project: 'Metro Line Ext', issueDate: '2026-05-12', expectedReturn: '2026-05-18', status: 'Returned' },
-    { id: 'TLI-003', toolName: 'Angle Grinder 4-inch', issuedTo: 'S. K. Sharma', project: 'Deepika Residency', issueDate: '2026-05-14', expectedReturn: '2026-05-20', status: 'Issued' },
-    { id: 'TLI-004', toolName: 'Safety Harnesses Full Body', issuedTo: 'Vijay Singh', project: 'Highrise Apartments', issueDate: '2026-05-15', expectedReturn: '2026-06-15', status: 'Issued' },
-  ];
+  const formatDateSafe = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    try {
+      return format(new Date(dateStr), 'dd-MM-yyyy');
+    } catch (e) {
+      return dateStr;
+    }
+  };
 
-  // Dynamic/Seed calculations for Vendor Balances and Financial Report (Purchase Team + Admin only)
+  // Dynamic calculations for Tool Issues from context state
+  const getToolIssuesData = () => {
+    return toolIssues.map(t => {
+      const toolName = tools.find(tl => tl.id === t.toolId)?.name || t.toolName || 'N/A';
+      const project = projects.find(p => p.id === t.projectId)?.name || 'N/A';
+      return {
+        id: t.id,
+        toolName,
+        issuedTo: t.issuedTo,
+        project,
+        issueDate: formatDateSafe(t.issueDate),
+        expectedReturn: formatDateSafe(t.expectedReturnDate),
+        status: t.status
+      };
+    });
+  };
+
+  // Dynamic calculations for Vendor Balances and Financial Report (Purchase Team + Admin only)
   const getFinancialData = () => {
     return vendors.map(v => {
       const vPOs = purchaseOrders.filter(po => po.vendorId === v.id);
-      let totalOrdered = vPOs.reduce((sum, po) => sum + po.items.reduce((acc, i) => acc + i.total, 0), 0);
-      let totalOrders = vPOs.length;
-      let lastOrderDate = vPOs.length > 0 ? format(new Date(vPOs[0].date), 'dd-MM-yyyy') : 'N/A';
-      
-      // Seed realistic non-zero mock values if no actual orders are in DB yet
-      if (totalOrdered === 0) {
-        if (v.name.includes('Steel') || v.name.includes('Balaji')) {
-          totalOrdered = 485000;
-          totalOrders = 3;
-          lastOrderDate = '15-05-2026';
-        } else if (v.name.includes('Cement') || v.name.includes('UltraTech')) {
-          totalOrdered = 320000;
-          totalOrders = 2;
-          lastOrderDate = '18-05-2026';
-        } else if (v.name.includes('Electrical') || v.name.includes('Havells')) {
-          totalOrdered = 125000;
-          totalOrders = 1;
-          lastOrderDate = '19-05-2026';
-        }
-      }
+      const totalOrdered = vPOs.reduce((sum, po) => sum + po.items.reduce((acc, i) => acc + i.total, 0), 0);
+      const totalOrders = vPOs.length;
+      const lastOrderDate = vPOs.length > 0 ? format(new Date(vPOs[0].date), 'dd-MM-yyyy') : 'N/A';
       
       const amountPaid = totalOrdered > 0 ? Math.round(totalOrdered * 0.75) : 0;
       const pendingPayable = totalOrdered - amountPaid;
@@ -63,13 +64,27 @@ export default function Reports() {
     }).filter(d => d.totalOrdered > 0);
   };
 
-  // Dynamic/Seed calculations for Quotations (Purchase Team + Admin only)
+  // Dynamic calculations for Quotations (Purchase Team + Admin only)
   const getQuotationsData = () => {
-    return [
-      { id: 'QTN-001', enqId: 'ENQ-001', vendorName: 'Sri Balaji Steel', project: 'Deepika Residency', amount: 385000, date: '18-05-2026', status: 'Selected' },
-      { id: 'QTN-002', enqId: 'ENQ-001', vendorName: 'VS Steel Traders', project: 'Deepika Residency', amount: 410000, date: '19-05-2026', status: 'Rejected' },
-      { id: 'QTN-003', enqId: 'ENQ-002', vendorName: 'UltraTech Cement Corp', project: 'Metro Line Ext', amount: 280000, date: '20-05-2026', status: 'Received' },
-    ];
+    return quotations.map(q => {
+      const vendorName = vendors.find(v => v.id === q.vendorId)?.name || 'N/A';
+      const enq = enquiries.find(e => e.id === q.enquiryId);
+      const project = projects.find(p => p.id === enq?.projectId)?.name || 'N/A';
+      const totalAmount = q.items?.reduce((acc, item) => {
+        const sub = item.qty * item.unitPrice;
+        return acc + sub + (sub * item.gst / 100);
+      }, 0) || 0;
+      
+      return {
+        id: q.id,
+        enqId: q.enquiryId,
+        vendorName,
+        project,
+        amount: totalAmount,
+        date: formatDateSafe(q.quoteDate),
+        status: 'Received'
+      };
+    });
   };
 
   // Assemble reports tabs based on roles
@@ -162,7 +177,7 @@ export default function Reports() {
           return row;
         });
       case 'tool_issue':
-        return toolIssueData.map(t => ({
+        return getToolIssuesData().map(t => ({
           'Issue ID': t.id,
           'Tool Name': t.toolName,
           'Issued To': t.issuedTo,
@@ -249,24 +264,30 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {qData.map(q => (
-                <tr key={q.id}>
-                  <td className="font-bold text-primary">{q.id}</td>
-                  <td className="font-medium text-text-dark">{q.enqId}</td>
-                  <td>{q.vendorName}</td>
-                  <td>{q.project}</td>
-                  <td className="text-right font-bold">₹{q.amount.toLocaleString()}</td>
-                  <td>{q.date}</td>
-                  <td>
-                    <span className={cn(
-                      "badge",
-                      q.status === 'Selected' ? "badge-success" : q.status === 'Rejected' ? "bg-red-100 text-red-800 border border-red-200 px-2.5 py-0.5 rounded-full text-xs font-semibold" : "badge-primary"
-                    )}>
-                      {q.status}
-                    </span>
-                  </td>
+              {qData.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="text-center p-8 text-text-gray italic">No quotations found.</td>
                 </tr>
-              ))}
+              ) : (
+                qData.map(q => (
+                  <tr key={q.id}>
+                    <td className="font-bold text-primary">{q.id}</td>
+                    <td className="font-medium text-text-dark">{q.enqId}</td>
+                    <td>{q.vendorName}</td>
+                    <td>{q.project}</td>
+                    <td className="text-right font-bold">₹{q.amount.toLocaleString()}</td>
+                    <td>{q.date}</td>
+                    <td>
+                      <span className={cn(
+                        "badge",
+                        q.status === 'Selected' ? "badge-success" : q.status === 'Rejected' ? "bg-red-100 text-red-800 border border-red-200 px-2.5 py-0.5 rounded-full text-xs font-semibold" : "badge-primary"
+                      )}>
+                        {q.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         );
@@ -366,6 +387,7 @@ export default function Reports() {
           </table>
         );
       case 'tool_issue':
+        const tiData = getToolIssuesData();
         return (
           <table className="erp-table animate-in fade-in duration-200">
             <thead>
@@ -380,24 +402,30 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {toolIssueData.map(t => (
-                <tr key={t.id}>
-                  <td className="font-bold text-primary">{t.id}</td>
-                  <td className="font-semibold text-text-dark">{t.toolName}</td>
-                  <td>{t.issuedTo}</td>
-                  <td>{t.project}</td>
-                  <td>{t.issueDate}</td>
-                  <td>{t.expectedReturn}</td>
-                  <td>
-                    <span className={cn(
-                      "badge",
-                      t.status === 'Returned' ? "badge-success" : "badge-warning"
-                    )}>
-                      {t.status}
-                    </span>
-                  </td>
+              {tiData.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="text-center p-8 text-text-gray italic">No tool issues recorded yet.</td>
                 </tr>
-              ))}
+              ) : (
+                tiData.map(t => (
+                  <tr key={t.id}>
+                    <td className="font-bold text-primary">{t.id}</td>
+                    <td className="font-semibold text-text-dark">{t.toolName}</td>
+                    <td>{t.issuedTo}</td>
+                    <td>{t.project}</td>
+                    <td>{t.issueDate}</td>
+                    <td>{t.expectedReturn}</td>
+                    <td>
+                      <span className={cn(
+                        "badge",
+                        t.status === 'Returned' ? "badge-success" : "badge-warning"
+                      )}>
+                        {t.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         );
@@ -417,17 +445,23 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {fData.map((f, idx) => (
-                <tr key={idx}>
-                  <td className="font-bold text-text-dark">{f.vendorName}</td>
-                  <td>{f.category}</td>
-                  <td className="text-center font-semibold">{f.totalOrders}</td>
-                  <td className="text-right font-bold">₹{f.totalOrdered.toLocaleString()}</td>
-                  <td className="text-right text-success font-semibold">₹{f.amountPaid.toLocaleString()}</td>
-                  <td className="text-right text-error font-bold">₹{f.pendingPayable.toLocaleString()}</td>
-                  <td className="font-medium text-text-gray">{f.lastOrderDate}</td>
+              {fData.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="text-center p-8 text-text-gray italic">No financial transaction data found.</td>
                 </tr>
-              ))}
+              ) : (
+                fData.map((f, idx) => (
+                  <tr key={idx}>
+                    <td className="font-bold text-text-dark">{f.vendorName}</td>
+                    <td>{f.category}</td>
+                    <td className="text-center font-semibold">{f.totalOrders}</td>
+                    <td className="text-right font-bold">₹{f.totalOrdered.toLocaleString()}</td>
+                    <td className="text-right text-success font-semibold">₹{f.amountPaid.toLocaleString()}</td>
+                    <td className="text-right text-error font-bold">₹{f.pendingPayable.toLocaleString()}</td>
+                    <td className="font-medium text-text-gray">{f.lastOrderDate}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         );

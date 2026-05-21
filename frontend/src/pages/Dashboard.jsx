@@ -131,11 +131,11 @@ export default function Dashboard() {
     // Sum PO values for this month
     const monthlySum = purchaseOrders
       .filter(p => p.date && new Date(p.date).getMonth() === monthIndex && new Date(p.date).getFullYear() === d.getFullYear())
-      .reduce((acc, p) => acc + p.items.reduce((sum, i) => sum + i.total, 0), 0);
+      .reduce((acc, p) => acc + p.items.reduce((sum, i) => sum + (i.total || 0), 0), 0) || 0;
       
     return {
       name: monthName,
-      value: monthlySum || (idx === 0 ? 120000 : idx === 1 ? 150000 : idx === 2 ? 180000 : idx === 3 ? 140000 : idx === 4 ? 210000 : 250000)
+      value: monthlySum
     };
   });
 
@@ -338,17 +338,23 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {materials.filter(m => m.currentStock <= m.minLevel).slice(0, 5).map(m => (
-                      <tr key={m.id}>
-                        <td className="font-medium">{m.name}</td>
-                        <td>{m.category}</td>
-                        <td className="text-error font-bold">{m.currentStock} {m.unit}</td>
-                        <td>{m.minLevel} {m.unit}</td>
-                        <td>
-                          <button onClick={() => window.location.href='/enquiry'} className="text-primary hover:underline text-sm font-semibold">Create Enquiry</button>
-                        </td>
+                    {materials.filter(m => m.currentStock <= m.minLevel).length === 0 ? (
+                      <tr>
+                        <td colSpan="5" className="p-8 text-center text-text-gray italic">No critical stock alerts found. All materials are above minimum level!</td>
                       </tr>
-                    ))}
+                    ) : (
+                      materials.filter(m => m.currentStock <= m.minLevel).slice(0, 5).map(m => (
+                        <tr key={m.id}>
+                          <td className="font-medium">{m.name}</td>
+                          <td>{m.category}</td>
+                          <td className="text-error font-bold">{m.currentStock} {m.unit}</td>
+                          <td>{m.minLevel} {m.unit}</td>
+                          <td>
+                            <button onClick={() => window.location.href='/enquiry'} className="text-primary hover:underline text-sm font-semibold">Create Enquiry</button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

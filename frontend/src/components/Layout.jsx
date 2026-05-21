@@ -1,11 +1,23 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { Bell, User, Menu, Search, LogOut } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 
 export default function Layout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { user } = useApp();
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+  const displayRole = user?.role === 'admin' 
+    ? 'Administrator' 
+    : user?.role === 'viewer' 
+    ? 'Viewer Portal' 
+    : user?.role === 'store_team'
+    ? 'Store Operations'
+    : user?.role === 'purchase_team'
+    ? 'Purchase Operations'
+    : 'Deepika Builtech';
 
   return (
     <div className="flex h-screen bg-primary-bg overflow-hidden">
@@ -41,8 +53,8 @@ export default function Layout({ children }) {
 
             <div className="flex items-center gap-3 pl-2">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-text-dark">Admin User</p>
-                <p className="text-xs text-text-gray">PEB Construction</p>
+                <p className="text-sm font-semibold text-text-dark">{user?.name || 'Guest User'}</p>
+                <p className="text-xs text-text-gray">{displayRole}</p>
               </div>
               <button className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
                 <User className="w-6 h-6" />

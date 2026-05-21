@@ -25,7 +25,7 @@ function App() {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-primary-bg gap-4">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-primary font-bold animate-pulse">Initializing PEB ERP System...</p>
+        <p className="text-primary font-bold animate-pulse">Initializing Deepika Builtech ERP System...</p>
       </div>
     );
   }

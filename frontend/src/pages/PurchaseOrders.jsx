@@ -26,9 +26,9 @@ export default function PurchaseOrders() {
     doc.rect(0, 0, 210, 40, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
-    doc.text('PEB WAREHOUSE CONSTRUCTION', 105, 20, { align: 'center' });
+    doc.text('DEEPIKA BUILTECH PRIVATE LIMITED', 105, 20, { align: 'center' });
     doc.setFontSize(10);
-    doc.text('123 Industrial Area, Phase II, City Name - 123456', 105, 30, { align: 'center' });
+    doc.text('No. 12, Main Road, Industrial Suburb, Bangalore - 560010', 105, 30, { align: 'center' });
 
     // PO Info
     doc.setTextColor(0, 0, 0);
