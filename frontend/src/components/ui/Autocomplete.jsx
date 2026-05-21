@@ -13,7 +13,8 @@ export default function Autocomplete({
   placeholder = "Search...", 
   label,
   className,
-  onAddNew
+  onAddNew,
+  value = ''
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -29,6 +30,14 @@ export default function Autocomplete({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const match = options.find(opt => opt.id === value || opt.name === value);
+    const expectedQuery = match ? match.name : (value || '');
+    if (query !== expectedQuery && !isOpen) {
+      setQuery(expectedQuery);
+    }
+  }, [value, options, isOpen]);
 
   useEffect(() => {
     if (query.trim() === '') {

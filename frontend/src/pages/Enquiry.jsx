@@ -165,6 +165,7 @@ export default function Enquiry() {
                 options={projects}
                 onSelect={(proj) => setFormData({...formData, projectId: proj.id})}
                 placeholder="Search Project..."
+                value={formData.projectId}
                 onAddNew={async (name) => {
                   const response = await addProject({ name, client: 'TBD', location: 'TBD', budget: 0, status: 'Active' });
                   const newProj = response?.data || response;
@@ -248,6 +249,7 @@ export default function Enquiry() {
                               if (newMat) handleItemSelect(index, newMat);
                             }}
                             placeholder={item.isSubItem ? "Type sub-item name..." : "Type material name..."}
+                            value={item.materialId}
                           />
                         </div>
                       </td>

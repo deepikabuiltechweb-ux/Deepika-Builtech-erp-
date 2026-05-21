@@ -49,10 +49,15 @@ export default function StoreGRN() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const vendorName = vendors.find(v => v.id === purchaseOrders.find(p => p.id === formData.poRef)?.vendorId)?.name || 'Unknown Vendor';
+    const po = purchaseOrders.find(p => p.id === formData.poRef);
+    const vendorId = po?.vendorId || '';
+    const vendorName = vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor';
     const newGRN = {
       ...formData,
-      vendorName
+      poId: formData.poRef,
+      vendorId,
+      vendorName,
+      invoiceNo: formData.dcNo
     };
 
     const success = await addGRN(newGRN);
@@ -102,6 +107,7 @@ export default function StoreGRN() {
                     .map(p => ({ ...p, name: `${p.id} - ${vendors.find(v => v.id === p.vendorId)?.name || 'Unknown'}` }))}
                   onSelect={(po) => handlePOSelect(po.id)}
                   placeholder="Search Pending PO..."
+                  value={formData.poRef}
                 />
               </div>
               <div>
@@ -238,8 +244,8 @@ export default function StoreGRN() {
                         <tr key={grn.id}>
                            <td className="font-semibold text-primary">{grn.id}</td>
                            <td>{format(new Date(grn.grnDate), 'dd-MM-yyyy')}</td>
-                           <td className="text-text-gray">{grn.poRef}</td>
-                           <td className="font-medium">{grn.vendorName}</td>
+                           <td className="text-text-gray">{grn.poRef || grn.poId}</td>
+                           <td className="font-medium">{grn.vendorName || vendors.find(v => v.id === grn.vendorId)?.name || 'Unknown Vendor'}</td>
                            <td>{grn.items.length} Items</td>
                            <td>
                               <div className="flex gap-2">

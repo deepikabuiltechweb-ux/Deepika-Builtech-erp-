@@ -121,6 +121,7 @@ export default function IssueMaterial() {
                     options={projects}
                     onSelect={(proj) => handleProjectSelect(proj.id)}
                     placeholder="Search Project..."
+                    value={formData.projectId}
                     onAddNew={async (name) => {
                       const newProj = await addProject({ name, client: 'TBD', location: 'TBD', budget: 0, status: 'Active' });
                       if (newProj) handleProjectSelect(newProj.id);
@@ -137,6 +138,7 @@ export default function IssueMaterial() {
                     options={purchaseOrders.map(po => ({ ...po, name: po.id }))}
                     onSelect={(po) => handlePOSelect(po.id)}
                     placeholder="Select existing PO..."
+                    value={formData.workOrderNo}
                  />
               </div>
            </div>
@@ -165,6 +167,7 @@ export default function IssueMaterial() {
                                options={materials}
                                onSelect={(mat) => handleItemSelect(index, mat)}
                                placeholder="Search stock..."
+                               value={item.materialId}
                             />
                          </td>
                          <td className="text-right font-medium text-text-gray">{item.available} {item.unit}</td>

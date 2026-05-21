@@ -181,6 +181,7 @@ export default function Quotations() {
               .map(e => ({ ...e, name: `${e.id} - ${e.workOrderNo}` }))}
             onSelect={(enq) => handleEnquirySelect(enq.id)}
             placeholder="Search Enquiry..."
+            value={entryForm.enquiryId}
           />
         </div>
         <div>
@@ -189,6 +190,7 @@ export default function Quotations() {
             options={vendors}
             onSelect={(vendor) => setEntryForm({...entryForm, vendorId: vendor.id})}
             placeholder="Search Vendor..."
+            value={entryForm.vendorId}
             onAddNew={async (name) => {
               const newVendor = await addVendor({ name, category: 'General', contact: 'N/A', email: 'N/A', city: 'TBD', rating: 3 });
               if (newVendor) setEntryForm({...entryForm, vendorId: newVendor.id});
