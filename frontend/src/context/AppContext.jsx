@@ -19,7 +19,26 @@ export const AppProvider = ({ children }) => {
   const [purchaseOrders, setPurchaseOrders] = useState(() => JSON.parse(localStorage.getItem('erp_pos')) || []);
   const [grns, setGrns] = useState(() => JSON.parse(localStorage.getItem('erp_grns')) || []);
   const [issues, setIssues] = useState(() => JSON.parse(localStorage.getItem('erp_issues')) || []);
-  const [tools, setTools] = useState(() => JSON.parse(localStorage.getItem('erp_tools')) || []);
+  const [tools, setTools] = useState(() => {
+    const localTools = localStorage.getItem('erp_tools');
+    if (localTools) {
+      try {
+        const parsed = JSON.parse(localTools);
+        if (parsed && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error("Error parsing tools", e);
+      }
+    }
+    const defaultTools = [
+      { id: 'TOL001', name: 'Welding Machine ARC-400', category: 'Machinery', totalQty: 8, availableQty: 6, repairQty: 2 },
+      { id: 'TOL002', name: 'Magnetic Core Drill Machine', category: 'Power Tools', totalQty: 5, availableQty: 5, repairQty: 0 },
+      { id: 'TOL003', name: 'Angle Grinder 4-inch', category: 'Hand Tools', totalQty: 15, availableQty: 12, repairQty: 3 },
+      { id: 'TOL004', name: 'Safety Harnesses Full Body', category: 'Safety Gear', totalQty: 50, availableQty: 48, repairQty: 2 },
+      { id: 'TOL005', name: 'Laser Distance Meter 100m', category: 'Instruments', totalQty: 6, availableQty: 6, repairQty: 0 },
+    ];
+    localStorage.setItem('erp_tools', JSON.stringify(defaultTools));
+    return defaultTools;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -322,7 +341,9 @@ export const AppProvider = ({ children }) => {
       tools, setTools, deleteTool,
       loading,
       isAdmin: user?.role === 'admin',
-      canEdit: user?.role === 'admin' || user?.role === 'staff',
+      isStoreTeam: user?.role === 'store_team' || user?.role === 'admin',
+      isPurchaseTeam: user?.role === 'purchase_team' || user?.role === 'admin',
+      canEdit: user?.role === 'admin' || user?.role === 'store_team' || user?.role === 'purchase_team' || user?.role === 'staff',
       isViewer: user?.role === 'viewer'
     }}>
       {children}

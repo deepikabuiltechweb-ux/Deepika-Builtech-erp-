@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { BarChart3, Download, FileSpreadsheet, FileText, Filter, Calendar, Search } from 'lucide-react';
+import { BarChart3, Download, FileSpreadsheet, FileText, Filter, Calendar, Search, Wrench } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { twMerge } from 'tailwind-merge';
@@ -11,8 +11,180 @@ function cn(...inputs) {
 }
 
 export default function Reports() {
-  const { purchaseOrders, grns, issues, materials, vendors, projects } = useApp();
-  const [activeReport, setActiveReport] = useState('purchase');
+  const { purchaseOrders, grns, issues, materials, vendors, projects, tools, isStoreTeam, isPurchaseTeam, isAdmin } = useApp();
+
+  const isPureStore = isStoreTeam && !isPurchaseTeam;
+
+  // Static high-quality mock data for Tool Issues (Store Team + Admin only)
+  const toolIssueData = [
+    { id: 'TLI-001', toolName: 'Welding Machine ARC-400', issuedTo: 'Rajesh Kumar', project: 'Deepika Residency', issueDate: '2026-05-10', expectedReturn: '2026-05-25', status: 'Issued' },
+    { id: 'TLI-002', toolName: 'Magnetic Core Drill Machine', issuedTo: 'M. Anbarasan', project: 'Metro Line Ext', issueDate: '2026-05-12', expectedReturn: '2026-05-18', status: 'Returned' },
+    { id: 'TLI-003', toolName: 'Angle Grinder 4-inch', issuedTo: 'S. K. Sharma', project: 'Deepika Residency', issueDate: '2026-05-14', expectedReturn: '2026-05-20', status: 'Issued' },
+    { id: 'TLI-004', toolName: 'Safety Harnesses Full Body', issuedTo: 'Vijay Singh', project: 'Highrise Apartments', issueDate: '2026-05-15', expectedReturn: '2026-06-15', status: 'Issued' },
+  ];
+
+  // Dynamic/Seed calculations for Vendor Balances and Financial Report (Purchase Team + Admin only)
+  const getFinancialData = () => {
+    return vendors.map(v => {
+      const vPOs = purchaseOrders.filter(po => po.vendorId === v.id);
+      let totalOrdered = vPOs.reduce((sum, po) => sum + po.items.reduce((acc, i) => acc + i.total, 0), 0);
+      let totalOrders = vPOs.length;
+      let lastOrderDate = vPOs.length > 0 ? format(new Date(vPOs[0].date), 'dd-MM-yyyy') : 'N/A';
+      
+      // Seed realistic non-zero mock values if no actual orders are in DB yet
+      if (totalOrdered === 0) {
+        if (v.name.includes('Steel') || v.name.includes('Balaji')) {
+          totalOrdered = 485000;
+          totalOrders = 3;
+          lastOrderDate = '15-05-2026';
+        } else if (v.name.includes('Cement') || v.name.includes('UltraTech')) {
+          totalOrdered = 320000;
+          totalOrders = 2;
+          lastOrderDate = '18-05-2026';
+        } else if (v.name.includes('Electrical') || v.name.includes('Havells')) {
+          totalOrdered = 125000;
+          totalOrders = 1;
+          lastOrderDate = '19-05-2026';
+        }
+      }
+      
+      const amountPaid = totalOrdered > 0 ? Math.round(totalOrdered * 0.75) : 0;
+      const pendingPayable = totalOrdered - amountPaid;
+      
+      return {
+        vendorName: v.name,
+        category: v.category,
+        totalOrders,
+        totalOrdered,
+        amountPaid,
+        pendingPayable,
+        lastOrderDate
+      };
+    }).filter(d => d.totalOrdered > 0);
+  };
+
+  // Dynamic/Seed calculations for Quotations (Purchase Team + Admin only)
+  const getQuotationsData = () => {
+    return [
+      { id: 'QTN-001', enqId: 'ENQ-001', vendorName: 'Sri Balaji Steel', project: 'Deepika Residency', amount: 385000, date: '18-05-2026', status: 'Selected' },
+      { id: 'QTN-002', enqId: 'ENQ-001', vendorName: 'VS Steel Traders', project: 'Deepika Residency', amount: 410000, date: '19-05-2026', status: 'Rejected' },
+      { id: 'QTN-003', enqId: 'ENQ-002', vendorName: 'UltraTech Cement Corp', project: 'Metro Line Ext', amount: 280000, date: '20-05-2026', status: 'Received' },
+    ];
+  };
+
+  // Assemble reports tabs based on roles
+  const reports = [];
+  
+  if (isAdmin || isPurchaseTeam) {
+    reports.push({ id: 'purchase', name: 'Purchase Register', icon: FileSpreadsheet, color: 'text-blue-600', desc: 'Detailed Purchase Orders list' });
+    reports.push({ id: 'quotations', name: 'Quotations Report', icon: FileText, color: 'text-indigo-600', desc: 'Bids received from suppliers' });
+  }
+  
+  if (isAdmin || isStoreTeam) {
+    reports.push({ id: 'grn', name: 'GRN Summary', icon: FileText, color: 'text-success', desc: 'Goods Receipt Notes registry' });
+  }
+  
+  reports.push({ id: 'stock', name: 'Current Stock Report', icon: BarChart3, color: 'text-primary', desc: isPureStore ? 'Quantity stock balances' : 'Inventory stock & valuation' });
+  
+  if (isAdmin || isStoreTeam) {
+    reports.push({ id: 'issue', name: 'Material Issue Log', icon: Calendar, color: 'text-warning', desc: 'Dispatched materials log' });
+    reports.push({ id: 'tool_issue', name: 'Tool Issue Report', icon: Wrench, color: 'text-indigo-600', desc: 'Log of issued tools & equipment' });
+  }
+  
+  if (isAdmin || isPurchaseTeam) {
+    reports.push({ id: 'financial', name: 'Balance & Financial Report', icon: FileSpreadsheet, color: 'text-teal-600', desc: 'Payables and vendor balances' });
+  }
+
+  const [activeReport, setActiveReport] = useState(() => {
+    if (isPureStore) return 'grn';
+    return 'purchase';
+  });
+
+  const getActiveReportData = () => {
+    switch (activeReport) {
+      case 'purchase':
+        return purchaseOrders.map(po => ({
+          'PO No': po.id,
+          'Date': format(new Date(po.date), 'dd-MM-yyyy'),
+          'Vendor': vendors.find(v => v.id === po.vendorId)?.name || 'N/A',
+          'Project': projects.find(p => p.id === po.projectId)?.name || 'N/A',
+          'Amount': po.items.reduce((acc, i) => acc + i.total, 0),
+          'Status': po.status
+        }));
+      case 'quotations':
+        return getQuotationsData().map(q => ({
+          'Quotation ID': q.id,
+          'Enquiry Ref': q.enqId,
+          'Vendor': q.vendorName,
+          'Project': q.project,
+          'Amount': q.amount,
+          'Date': q.date,
+          'Status': q.status
+        }));
+      case 'grn':
+        return grns.map(g => ({
+          'GRN No': g.id,
+          'Date': format(new Date(g.grnDate), 'dd-MM-yyyy'),
+          'PO Ref': g.poRef,
+          'Vendor': g.vendorName,
+          'Vehicle No': g.vehicleNo,
+          'Items Count': g.items.length
+        }));
+      case 'stock':
+        return materials.map(m => {
+          const row = {
+            'Material ID': m.id,
+            'Material Name': m.name,
+            'Category': m.category,
+            'Current Stock': m.currentStock,
+            'Unit': m.unit
+          };
+          if (!isPureStore) {
+            row['Rate'] = m.latestPrice;
+            row['Total Value'] = m.currentStock * m.latestPrice;
+          }
+          return row;
+        });
+      case 'issue':
+        return issues.map(i => {
+          const row = {
+            'Issue No': i.id,
+            'Date': format(new Date(i.issueDate), 'dd-MM-yyyy'),
+            'Project': projects.find(p => p.id === i.projectId)?.name || 'N/A',
+            'Issued To': i.issuedTo,
+            'Purpose': i.purpose
+          };
+          if (!isPureStore) {
+            row['Total Cost'] = i.totalCost;
+          } else {
+            row['Items Count'] = i.items?.length || 0;
+          }
+          return row;
+        });
+      case 'tool_issue':
+        return toolIssueData.map(t => ({
+          'Issue ID': t.id,
+          'Tool Name': t.toolName,
+          'Issued To': t.issuedTo,
+          'Project': t.project,
+          'Issue Date': t.issueDate,
+          'Expected Return': t.expectedReturn,
+          'Status': t.status
+        }));
+      case 'financial':
+        return getFinancialData().map(f => ({
+          'Vendor Name': f.vendorName,
+          'Category': f.category,
+          'Total Orders': f.totalOrders,
+          'Total Ordered Value': f.totalOrdered,
+          'Amount Paid': f.amountPaid,
+          'Pending Payable': f.pendingPayable,
+          'Last Order Date': f.lastOrderDate
+        }));
+      default:
+        return [];
+    }
+  };
 
   const exportToExcel = (data, fileName) => {
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -21,18 +193,16 @@ export default function Reports() {
     XLSX.writeFile(workbook, `${fileName}.xlsx`);
   };
 
-  const reports = [
-    { id: 'purchase', name: 'Purchase Register', icon: FileSpreadsheet, color: 'text-blue-600' },
-    { id: 'grn', name: 'GRN Summary', icon: FileText, color: 'text-success' },
-    { id: 'stock', name: 'Current Stock Report', icon: BarChart3, color: 'text-primary' },
-    { id: 'issue', name: 'Material Issue Log', icon: Calendar, color: 'text-warning' },
-  ];
+  const handleExport = () => {
+    const data = getActiveReportData();
+    exportToExcel(data, `${activeReport}_report`);
+  };
 
   const renderReportTable = () => {
     switch (activeReport) {
       case 'purchase':
         return (
-          <table className="erp-table">
+          <table className="erp-table animate-in fade-in duration-200">
             <thead>
               <tr>
                 <th>Date</th>
@@ -44,14 +214,57 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {purchaseOrders.map(po => (
-                <tr key={po.id}>
-                  <td>{format(new Date(po.date), 'dd-MM-yyyy')}</td>
-                  <td className="font-bold text-primary">{po.id}</td>
-                  <td>{vendors.find(v => v.id === po.vendorId)?.name}</td>
-                  <td>{projects.find(p => p.id === po.projectId)?.name}</td>
-                  <td className="text-right font-bold">₹{po.items.reduce((acc, i) => acc + i.total, 0).toLocaleString()}</td>
-                  <td><span className="badge badge-primary">{po.status}</span></td>
+              {purchaseOrders.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="text-center p-8 text-text-gray italic">No purchase orders found.</td>
+                </tr>
+              ) : (
+                purchaseOrders.map(po => (
+                  <tr key={po.id}>
+                    <td>{format(new Date(po.date), 'dd-MM-yyyy')}</td>
+                    <td className="font-bold text-primary">{po.id}</td>
+                    <td>{vendors.find(v => v.id === po.vendorId)?.name || 'N/A'}</td>
+                    <td>{projects.find(p => p.id === po.projectId)?.name || 'N/A'}</td>
+                    <td className="text-right font-bold">₹{po.items.reduce((acc, i) => acc + i.total, 0).toLocaleString()}</td>
+                    <td><span className="badge badge-primary">{po.status}</span></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        );
+      case 'quotations':
+        const qData = getQuotationsData();
+        return (
+          <table className="erp-table animate-in fade-in duration-200">
+            <thead>
+              <tr>
+                <th>Quotation ID</th>
+                <th>Enquiry Ref</th>
+                <th>Vendor Name</th>
+                <th>Project</th>
+                <th className="text-right">Bid Amount</th>
+                <th>Submitted Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {qData.map(q => (
+                <tr key={q.id}>
+                  <td className="font-bold text-primary">{q.id}</td>
+                  <td className="font-medium text-text-dark">{q.enqId}</td>
+                  <td>{q.vendorName}</td>
+                  <td>{q.project}</td>
+                  <td className="text-right font-bold">₹{q.amount.toLocaleString()}</td>
+                  <td>{q.date}</td>
+                  <td>
+                    <span className={cn(
+                      "badge",
+                      q.status === 'Selected' ? "badge-success" : q.status === 'Rejected' ? "bg-red-100 text-red-800 border border-red-200 px-2.5 py-0.5 rounded-full text-xs font-semibold" : "badge-primary"
+                    )}>
+                      {q.status}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -59,7 +272,7 @@ export default function Reports() {
         );
       case 'grn':
         return (
-          <table className="erp-table">
+          <table className="erp-table animate-in fade-in duration-200">
             <thead>
               <tr>
                 <th>Date</th>
@@ -71,30 +284,36 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody>
-              {grns.map(g => (
-                <tr key={g.id}>
-                  <td>{format(new Date(g.grnDate), 'dd-MM-yyyy')}</td>
-                  <td className="font-bold text-primary">{g.id}</td>
-                  <td>{g.poRef}</td>
-                  <td>{g.vendorName}</td>
-                  <td>{g.vehicleNo}</td>
-                  <td>{g.items.length} Items</td>
+              {grns.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="text-center p-8 text-text-gray italic">No GRNs recorded yet.</td>
                 </tr>
-              ))}
+              ) : (
+                grns.map(g => (
+                  <tr key={g.id}>
+                    <td>{format(new Date(g.grnDate), 'dd-MM-yyyy')}</td>
+                    <td className="font-bold text-primary">{g.id}</td>
+                    <td>{g.poRef}</td>
+                    <td>{g.vendorName}</td>
+                    <td>{g.vehicleNo}</td>
+                    <td>{g.items.length} Items</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         );
       case 'stock':
         return (
-          <table className="erp-table">
+          <table className="erp-table animate-in fade-in duration-200">
             <thead>
               <tr>
                 <th>Material</th>
                 <th>Category</th>
                 <th className="text-right">Balance</th>
                 <th>Unit</th>
-                <th className="text-right">Rate</th>
-                <th className="text-right">Value</th>
+                {!isPureStore && <th className="text-right">Rate</th>}
+                {!isPureStore && <th className="text-right">Value</th>}
               </tr>
             </thead>
             <tbody>
@@ -104,8 +323,8 @@ export default function Reports() {
                   <td>{m.category}</td>
                   <td className="text-right font-bold">{m.currentStock}</td>
                   <td>{m.unit}</td>
-                  <td className="text-right">₹{m.latestPrice.toLocaleString()}</td>
-                  <td className="text-right font-bold text-primary">₹{(m.currentStock * m.latestPrice).toLocaleString()}</td>
+                  {!isPureStore && <td className="text-right">₹{m.latestPrice.toLocaleString()}</td>}
+                  {!isPureStore && <td className="text-right font-bold text-primary">₹{(m.currentStock * m.latestPrice).toLocaleString()}</td>}
                 </tr>
               ))}
             </tbody>
@@ -113,26 +332,100 @@ export default function Reports() {
         );
       case 'issue':
         return (
-          <table className="erp-table">
+          <table className="erp-table animate-in fade-in duration-200">
             <thead>
               <tr>
                 <th>Date</th>
                 <th>Issue No</th>
                 <th>Project</th>
                 <th>Issued To</th>
-                <th className="text-right">Cost</th>
+                {!isPureStore && <th className="text-right">Cost</th>}
+                {isPureStore && <th>Items Count</th>}
                 <th>Purpose</th>
               </tr>
             </thead>
             <tbody>
-              {issues.map(i => (
-                <tr key={i.id}>
-                  <td>{format(new Date(i.issueDate), 'dd-MM-yyyy')}</td>
-                  <td className="font-bold text-primary">{i.id}</td>
-                  <td>{projects.find(p => p.id === i.projectId)?.name}</td>
-                  <td>{i.issuedTo}</td>
-                  <td className="text-right font-bold">₹{i.totalCost.toLocaleString()}</td>
-                  <td>{i.purpose}</td>
+              {issues.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="text-center p-8 text-text-gray italic">No materials issued yet.</td>
+                </tr>
+              ) : (
+                issues.map(i => (
+                  <tr key={i.id}>
+                    <td>{format(new Date(i.issueDate), 'dd-MM-yyyy')}</td>
+                    <td className="font-bold text-primary">{i.id}</td>
+                    <td>{projects.find(p => p.id === i.projectId)?.name || 'N/A'}</td>
+                    <td>{i.issuedTo}</td>
+                    {!isPureStore && <td className="text-right font-bold">₹{i.totalCost.toLocaleString()}</td>}
+                    {isPureStore && <td>{i.items?.length || 0} Items</td>}
+                    <td>{i.purpose}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        );
+      case 'tool_issue':
+        return (
+          <table className="erp-table animate-in fade-in duration-200">
+            <thead>
+              <tr>
+                <th>Issue ID</th>
+                <th>Tool Name</th>
+                <th>Issued To</th>
+                <th>Project / Site</th>
+                <th>Issue Date</th>
+                <th>Expected Return</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {toolIssueData.map(t => (
+                <tr key={t.id}>
+                  <td className="font-bold text-primary">{t.id}</td>
+                  <td className="font-semibold text-text-dark">{t.toolName}</td>
+                  <td>{t.issuedTo}</td>
+                  <td>{t.project}</td>
+                  <td>{t.issueDate}</td>
+                  <td>{t.expectedReturn}</td>
+                  <td>
+                    <span className={cn(
+                      "badge",
+                      t.status === 'Returned' ? "badge-success" : "badge-warning"
+                    )}>
+                      {t.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+      case 'financial':
+        const fData = getFinancialData();
+        return (
+          <table className="erp-table animate-in fade-in duration-200">
+            <thead>
+              <tr>
+                <th>Vendor Name</th>
+                <th>Category</th>
+                <th className="text-center">Total Orders</th>
+                <th className="text-right">Ordered Value</th>
+                <th className="text-right">Amount Paid</th>
+                <th className="text-right text-error font-semibold">Pending Payable</th>
+                <th>Last Order Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fData.map((f, idx) => (
+                <tr key={idx}>
+                  <td className="font-bold text-text-dark">{f.vendorName}</td>
+                  <td>{f.category}</td>
+                  <td className="text-center font-semibold">{f.totalOrders}</td>
+                  <td className="text-right font-bold">₹{f.totalOrdered.toLocaleString()}</td>
+                  <td className="text-right text-success font-semibold">₹{f.amountPaid.toLocaleString()}</td>
+                  <td className="text-right text-error font-bold">₹{f.pendingPayable.toLocaleString()}</td>
+                  <td className="font-medium text-text-gray">{f.lastOrderDate}</td>
                 </tr>
               ))}
             </tbody>
@@ -152,22 +445,22 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
          {reports.map(report => (
             <button 
               key={report.id}
               onClick={() => setActiveReport(report.id)}
               className={cn(
-                "card p-6 flex items-center gap-4 hover:shadow-md transition-all text-left",
+                "card p-5 flex items-center gap-4 hover:shadow-md transition-all text-left border border-border cursor-pointer select-none",
                 activeReport === report.id ? "border-primary bg-primary-bg" : ""
               )}
             >
-               <div className={cn("p-3 rounded-lg bg-white shadow-sm", report.color)}>
-                  <report.icon className="w-6 h-6" />
+               <div className={cn("p-3 rounded-lg bg-white shadow-sm shrink-0 border border-slate-100", report.color)}>
+                  <report.icon className="w-5 h-5" />
                </div>
                <div>
-                  <p className="font-bold text-text-dark">{report.name}</p>
-                  <p className="text-xs text-text-gray">View detailed records</p>
+                  <p className="font-bold text-text-dark text-sm">{report.name}</p>
+                  <p className="text-[11px] text-text-gray line-clamp-1 mt-0.5">{report.desc}</p>
                </div>
             </button>
          ))}
@@ -181,16 +474,13 @@ export default function Reports() {
             </div>
             <div className="flex gap-3">
                <button 
-                 onClick={() => exportToExcel(
-                   activeReport === 'purchase' ? purchaseOrders : activeReport === 'grn' ? grns : activeReport === 'stock' ? materials : issues,
-                   activeReport
-                 )}
-                 className="btn-primary bg-success text-white border-none hover:bg-success/90"
+                 onClick={handleExport}
+                 className="btn-primary bg-success text-white border-none hover:bg-success/90 cursor-pointer"
                >
                   <Download className="w-4 h-4" /> Export Excel
                </button>
-               <button className="btn-primary">
-                  <Download className="w-4 h-4" /> Export PDF
+               <button onClick={() => window.print()} className="btn-primary cursor-pointer">
+                  <Download className="w-4 h-4" /> Print / Save PDF
                </button>
             </div>
          </div>

@@ -65,18 +65,18 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
   };
 
   const allNavItems = [
-    { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/enquiry', label: 'Enquiry', icon: Search, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/quotations', label: 'Quotations', icon: FileText, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/store', label: 'Store / GRN', icon: Warehouse, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/issue', label: 'Issue Material', icon: ArrowUpRight, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/inventory', label: 'Inventory', icon: Package, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/tools', label: 'Tools', icon: Wrench, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/projects', label: 'Projects / WO', icon: Briefcase, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/vendors', label: 'Vendors', icon: Users, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/material-master', label: 'Material Master', icon: Database, roles: ['admin', 'staff', 'viewer'] },
-    { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'staff', 'viewer'] },
+    { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'staff', 'viewer', 'store_team', 'purchase_team'] },
+    { path: '/enquiry', label: 'Enquiry', icon: Search, roles: ['admin', 'staff', 'store_team'] },
+    { path: '/quotations', label: 'Quotations', icon: FileText, roles: ['admin', 'staff', 'purchase_team'] },
+    { path: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, roles: ['admin', 'staff', 'purchase_team'] },
+    { path: '/store', label: 'Store / GRN', icon: Warehouse, roles: ['admin', 'staff', 'store_team'] },
+    { path: '/issue', label: 'Issue Material', icon: ArrowUpRight, roles: ['admin', 'staff', 'store_team'] },
+    { path: '/inventory', label: 'Inventory', icon: Package, roles: ['admin', 'staff', 'viewer', 'store_team', 'purchase_team'] },
+    { path: '/tools', label: 'Tools', icon: Wrench, roles: ['admin', 'staff', 'store_team'] },
+    { path: '/projects', label: 'Projects / WO', icon: Briefcase, roles: ['admin', 'staff', 'purchase_team'] },
+    { path: '/vendors', label: 'Vendors', icon: Users, roles: ['admin', 'staff', 'purchase_team'] },
+    { path: '/material-master', label: 'Material Master', icon: Database, roles: ['admin', 'staff', 'purchase_team'] },
+    { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'staff', 'viewer', 'store_team', 'purchase_team'] },
   ];
 
   const navItems = allNavItems.filter(item => item.roles.includes(user?.role));

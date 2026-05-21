@@ -46,7 +46,7 @@ const createCRUD = (model, name) => {
 
   // CREATE with Cache Invalidation
   // Using broad roles here to keep frontend working since current users might be 'staff' or 'admin'
-  router.post(`/${name}`, protect, authorize('superadmin', 'admin', 'manager', 'staff'), asyncHandler(async (req, res) => {
+  router.post(`/${name}`, protect, authorize('superadmin', 'admin', 'manager', 'staff', 'store_team', 'purchase_team'), asyncHandler(async (req, res) => {
     const item = new model(req.body);
     const saved = await item.save();
     
@@ -56,7 +56,7 @@ const createCRUD = (model, name) => {
   }));
 
   // UPDATE
-  router.put(`/${name}/:id`, protect, authorize('superadmin', 'admin', 'manager', 'staff'), asyncHandler(async (req, res) => {
+  router.put(`/${name}/:id`, protect, authorize('superadmin', 'admin', 'manager', 'staff', 'store_team', 'purchase_team'), asyncHandler(async (req, res) => {
     const { id } = req.params;
     let updated = await model.findOneAndUpdate({ id: id }, req.body, { new: true });
     if (!updated && mongoose.Types.ObjectId.isValid(id)) {

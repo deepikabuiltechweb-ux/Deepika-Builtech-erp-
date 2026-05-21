@@ -19,22 +19,91 @@ export default function Enquiry() {
     projectId: '',
     workOrderNo: '',
     requiredDate: '',
-    items: [{ id: Date.now(), materialId: '', name: '', qty: 0, unit: '', requiredDate: '' }],
+    items: [{ id: Date.now(), materialId: '', name: '', qty: 0, unit: '', requiredDate: '', isSubItem: false, mainNum: 1, displayNum: '1' }],
     selectedVendors: []
   });
 
+  const recalculateDisplayNums = (items) => {
+    let mainCounter = 0;
+    const subLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+    let subCounter = 0;
+    
+    return items.map((item) => {
+      if (!item.isSubItem) {
+        mainCounter++;
+        subCounter = 0;
+        return {
+          ...item,
+          mainNum: mainCounter,
+          displayNum: String(mainCounter)
+        };
+      } else {
+        const letter = subLetters[subCounter % subLetters.length];
+        const res = {
+          ...item,
+          mainNum: mainCounter,
+          displayNum: `${mainCounter}${letter}`
+        };
+        subCounter++;
+        return res;
+      }
+    });
+  };
+
   const handleAddItem = () => {
+    const newItems = [
+      ...formData.items,
+      { id: Date.now() + Math.random(), materialId: '', name: '', qty: 0, unit: '', requiredDate: '', isSubItem: false, mainNum: 0, displayNum: '' }
+    ];
     setFormData({
       ...formData,
-      items: [...formData.items, { id: Date.now(), materialId: '', name: '', qty: 0, unit: '', requiredDate: '' }]
+      items: recalculateDisplayNums(newItems)
+    });
+  };
+
+  const handleAddSubItem = (targetId) => {
+    const clickedItem = formData.items.find(item => item.id === targetId);
+    if (!clickedItem) return;
+    
+    const targetMainNum = clickedItem.mainNum;
+    
+    let lastIndex = -1;
+    for (let i = formData.items.length - 1; i >= 0; i--) {
+      if (formData.items[i].mainNum === targetMainNum) {
+        lastIndex = i;
+        break;
+      }
+    }
+    
+    if (lastIndex === -1) return;
+    
+    const newSubItem = {
+      id: Date.now() + Math.random(),
+      materialId: '',
+      name: '',
+      qty: 0,
+      unit: '',
+      requiredDate: '',
+      isSubItem: true,
+      mainNum: targetMainNum,
+      displayNum: ''
+    };
+    
+    const updatedItems = [...formData.items];
+    updatedItems.splice(lastIndex + 1, 0, newSubItem);
+    
+    setFormData({
+      ...formData,
+      items: recalculateDisplayNums(updatedItems)
     });
   };
 
   const handleRemoveItem = (id) => {
     if (formData.items.length === 1) return;
+    const filtered = formData.items.filter(item => item.id !== id);
     setFormData({
       ...formData,
-      items: formData.items.filter(item => item.id !== id)
+      items: recalculateDisplayNums(filtered)
     });
   };
 
@@ -73,7 +142,7 @@ export default function Enquiry() {
       projectId: '',
       workOrderNo: '',
       requiredDate: '',
-      items: [{ id: Date.now(), materialId: '', name: '', qty: 0, unit: '', requiredDate: '' }],
+      items: [{ id: Date.now(), materialId: '', name: '', qty: 0, unit: '', requiredDate: '', isSubItem: false, mainNum: 1, displayNum: '1' }],
       selectedVendors: []
     });
   };
@@ -146,19 +215,46 @@ export default function Enquiry() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {formData.items.map((item, index) => (
-                    <tr key={item.id}>
-                      <td className="p-3 text-center text-text-gray font-medium">{index + 1}</td>
+                    <tr key={item.id} className={cn(
+                      "transition-all duration-150",
+                      item.isSubItem ? "bg-slate-50/60 hover:bg-slate-100/80 font-medium" : "hover:bg-slate-50/80"
+                    )}>
+                      <td className="p-3 pr-1 text-left text-text-gray font-medium">
+                        <div className="flex items-center gap-1.5 select-none">
+                          {item.isSubItem && (
+                            <span className="text-primary font-bold text-sm pl-2 shrink-0">
+                              ↳
+                            </span>
+                          )}
+                          <span className={cn(
+                            "font-bold text-sm tracking-tight inline-block",
+                            item.isSubItem ? "text-slate-500 text-xs" : "text-primary"
+                          )}>
+                            {item.displayNum}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleAddSubItem(item.id)}
+                            className="p-1 rounded-md bg-success/10 text-success hover:bg-success/20 transition-all border border-success/10 cursor-pointer"
+                            title="Add subdivision item (+)"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </td>
                       <td className="p-3">
-                        <Autocomplete 
-                          options={materials}
-                          onSelect={(mat) => handleItemSelect(index, mat)}
-                          onAddNew={async (name) => {
-                            const response = await addMaterial({ name, category: 'General', unit: 'Nos', brand: '', lastPrice: 0, latestPrice: 0, currentStock: 0, minLevel: 0 });
-                            const newMat = response?.data || response;
-                            if (newMat) handleItemSelect(index, newMat);
-                          }}
-                          placeholder="Type material name..."
-                        />
+                        <div className={cn(item.isSubItem ? "pl-2" : "")}>
+                          <Autocomplete 
+                            options={materials}
+                            onSelect={(mat) => handleItemSelect(index, mat)}
+                            onAddNew={async (name) => {
+                              const response = await addMaterial({ name, category: 'General', unit: 'Nos', brand: '', lastPrice: 0, latestPrice: 0, currentStock: 0, minLevel: 0 });
+                              const newMat = response?.data || response;
+                              if (newMat) handleItemSelect(index, newMat);
+                            }}
+                            placeholder={item.isSubItem ? "Type sub-item name..." : "Type material name..."}
+                          />
+                        </div>
                       </td>
                       <td className="p-3">
                         <input 
@@ -202,7 +298,8 @@ export default function Enquiry() {
                         <button 
                           type="button" 
                           onClick={() => handleRemoveItem(item.id)}
-                          className="p-2 text-error hover:bg-error/10 rounded"
+                          className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer"
+                          title="Remove item row"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
