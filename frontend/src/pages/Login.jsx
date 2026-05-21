@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Warehouse, LogIn, Mail, Lock, Shield, Package, ShoppingBag, ClipboardList, CheckCircle } from 'lucide-react';
+import { Warehouse, LogIn, Mail, Lock, Shield, Package, ShoppingBag, ClipboardList, CheckCircle, Eye } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -10,7 +10,7 @@ function cn(...inputs) {
 
 export default function Login() {
   const { login, logout } = useApp();
-  const [portal, setPortal] = useState('store'); // 'store' or 'purchase'
+  const [portal, setPortal] = useState('store'); // 'store', 'purchase', or 'viewer'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -32,13 +32,17 @@ export default function Login() {
         const isUserAdmin = storedUser.role === 'admin';
         const isUserStore = storedUser.role === 'store_team';
         const isUserPurchase = storedUser.role === 'purchase_team';
+        const isUserViewer = storedUser.role === 'viewer';
 
         if (portal === 'store' && !isUserStore && !isUserAdmin) {
           logout();
-          setError('Access Denied: This account is not authorized for the Store Team portal. Please log in through the Purchase Team portal.');
+          setError('Access Denied: This account is not authorized for the Store Team portal. Please select the correct portal.');
         } else if (portal === 'purchase' && !isUserPurchase && !isUserAdmin) {
           logout();
-          setError('Access Denied: This account is not authorized for the Purchase Team portal. Please log in through the Store Team portal.');
+          setError('Access Denied: This account is not authorized for the Purchase Team portal. Please select the correct portal.');
+        } else if (portal === 'viewer' && !isUserViewer && !isUserAdmin) {
+          logout();
+          setError('Access Denied: This account is not authorized for the View Only Portal. Please select the correct portal.');
         }
       }
     } else {
@@ -56,7 +60,7 @@ export default function Login() {
         {/* Branding Side */}
         <div className={cn(
           "md:w-1/2 p-12 text-white flex flex-col justify-between transition-all duration-700 relative",
-          portal === 'store' ? "bg-primary-dark" : "bg-slate-900"
+          portal === 'store' ? "bg-primary-dark" : portal === 'purchase' ? "bg-slate-900" : "bg-sky-950"
         )}>
           {/* Subtle grid pattern background */}
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:24px_24px]"></div>
@@ -64,9 +68,9 @@ export default function Login() {
           <div className="relative z-10">
             <div className={cn(
               "w-14 h-14 rounded-2xl flex items-center justify-center mb-8 shadow-lg transition-transform hover:scale-105 duration-300",
-              portal === 'store' ? "bg-white text-primary-dark" : "bg-white text-slate-900"
+              portal === 'store' ? "bg-white text-primary-dark" : portal === 'purchase' ? "bg-white text-slate-900" : "bg-white text-sky-950"
             )}>
-              {portal === 'store' ? <Warehouse className="w-8 h-8" /> : <ShoppingBag className="w-8 h-8" />}
+              {portal === 'store' ? <Warehouse className="w-8 h-8" /> : portal === 'purchase' ? <ShoppingBag className="w-8 h-8" /> : <Eye className="w-8 h-8" />}
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight mb-3">DEEPIKA BUILTECH ERP</h1>
             <p className="text-white/75 leading-relaxed text-sm font-medium">
@@ -87,7 +91,7 @@ export default function Login() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-white/50">Core Module</p>
                 <p className="text-sm font-semibold text-white/90">
-                  {portal === 'store' ? 'Store & Issue Records' : 'Purchase Orders & Financials'}
+                  {portal === 'store' ? 'Store & Issue Records' : portal === 'purchase' ? 'Purchase Orders & Financials' : 'System View Only & Reports'}
                 </p>
               </div>
             </div>
@@ -102,7 +106,7 @@ export default function Login() {
           </div>
 
           {/* Portal Tabs Selector */}
-          <div className="grid grid-cols-2 p-1.5 bg-slate-100 rounded-2xl mb-8 relative border border-slate-200">
+          <div className="grid grid-cols-3 p-1 bg-slate-100 rounded-2xl mb-8 relative border border-slate-200 gap-1">
             <button
               type="button"
               onClick={() => {
@@ -110,14 +114,14 @@ export default function Login() {
                 setError('');
               }}
               className={cn(
-                "py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all duration-300",
+                "py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 transition-all duration-300",
                 portal === 'store'
                   ? "bg-white text-primary shadow-[0_4px_12px_rgba(0,0,0,0.05)]"
                   : "text-slate-500 hover:text-slate-800"
               )}
             >
-              <Warehouse className="w-4 h-4" />
-              Store Team
+              <Warehouse className="w-3.5 h-3.5" />
+              Store
             </button>
             <button
               type="button"
@@ -126,14 +130,30 @@ export default function Login() {
                 setError('');
               }}
               className={cn(
-                "py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all duration-300",
+                "py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 transition-all duration-300",
                 portal === 'purchase'
                   ? "bg-slate-900 text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
                   : "text-slate-500 hover:text-slate-800"
               )}
             >
-              <ShoppingBag className="w-4 h-4" />
-              Purchase Team
+              <ShoppingBag className="w-3.5 h-3.5" />
+              Purchase
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPortal('viewer');
+                setError('');
+              }}
+              className={cn(
+                "py-2.5 rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 transition-all duration-300",
+                portal === 'viewer'
+                  ? "bg-sky-950 text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+                  : "text-slate-500 hover:text-slate-800"
+              )}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              Viewer
             </button>
           </div>
 
@@ -146,7 +166,7 @@ export default function Login() {
                   type="email" 
                   required
                   className="input-field pl-10 py-3 text-sm focus:border-slate-400"
-                  placeholder={portal === 'store' ? "store@deepikabuiltech.com" : "purchase@deepikabuiltech.com"}
+                  placeholder={portal === 'store' ? "store@deepikabuiltech.com" : portal === 'purchase' ? "purchase@deepikabuiltech.com" : "viewer@deepikabuiltech.com"}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
@@ -180,14 +200,18 @@ export default function Login() {
               className={cn(
                 "w-full py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2",
                 loading ? "opacity-90 cursor-not-allowed" : "",
-                portal === 'store' ? "bg-primary text-white hover:bg-primary-dark" : "bg-slate-900 text-white hover:bg-slate-800"
+                portal === 'store' 
+                  ? "bg-primary text-white hover:bg-primary-dark" 
+                  : portal === 'purchase' 
+                    ? "bg-slate-900 text-white hover:bg-slate-800" 
+                    : "bg-sky-950 text-white hover:bg-sky-900"
               )}
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
                 <>
-                  <span>Enter {portal === 'store' ? 'Store Portal' : 'Purchase Portal'}</span>
+                  <span>Enter {portal === 'store' ? 'Store Portal' : portal === 'purchase' ? 'Purchase Portal' : 'Viewer Portal'}</span>
                   <LogIn className="w-4 h-4" />
                 </>
               )}
@@ -198,7 +222,7 @@ export default function Login() {
           <div className="mt-8 p-3.5 bg-slate-50 rounded-xl border border-slate-200/50 flex items-start gap-2.5">
             <ClipboardList className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
             <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
-              Demo accounts seeded: Use <span className="font-bold text-slate-700">store@deepikabuiltech.com</span> (pwd: store@123) for Store or <span className="font-bold text-slate-700">purchase@deepikabuiltech.com</span> (pwd: purchase@123) for Purchase.
+              Demo credentials: <span className="font-bold text-slate-700">store@deepikabuiltech.com</span> (store@123), <span className="font-bold text-slate-700">purchase@deepikabuiltech.com</span> (purchase@123), or <span className="font-bold text-slate-700">viewer@deepikabuiltech.com</span> (viewer@123) for read-only access.
             </p>
           </div>
         </div>

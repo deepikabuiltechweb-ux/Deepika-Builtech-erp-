@@ -17,7 +17,8 @@ import {
   X,
   ShieldCheck,
   Store,
-  DownloadCloud
+  DownloadCloud,
+  Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { clsx } from 'clsx';
@@ -112,13 +113,19 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
           <div className="px-6 mb-4">
              <div className="p-3 bg-white/10 rounded-xl flex items-center gap-3">
                 <div className={cn(
-                   "w-8 h-8 rounded-lg flex items-center justify-center",
-                   user?.role === 'admin' ? "bg-success" : "bg-warning"
+                   "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                   user?.role === 'admin' ? "bg-success" : user?.role === 'viewer' ? "bg-sky-500" : "bg-warning"
                 )}>
-                   {user?.role === 'admin' ? <ShieldCheck className="w-5 h-5 text-white" /> : <Store className="w-5 h-5 text-white" />}
+                   {user?.role === 'admin' ? (
+                     <ShieldCheck className="w-5 h-5 text-white" />
+                   ) : user?.role === 'viewer' ? (
+                     <Eye className="w-5 h-5 text-white" />
+                   ) : (
+                     <Store className="w-5 h-5 text-white" />
+                   )}
                 </div>
-                <div>
-                   <p className="text-xs font-bold uppercase tracking-widest opacity-50">{user?.role} Portal</p>
+                <div className="min-w-0">
+                   <p className="text-xs font-bold uppercase tracking-widest opacity-50 truncate">{user?.role} Portal</p>
                    <p className="text-sm font-semibold truncate">{user?.name}</p>
                 </div>
              </div>
