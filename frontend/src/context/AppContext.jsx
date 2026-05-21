@@ -19,13 +19,28 @@ export const AppProvider = ({ children }) => {
   const [purchaseOrders, setPurchaseOrders] = useState(() => JSON.parse(localStorage.getItem('erp_pos')) || []);
   const [grns, setGrns] = useState(() => JSON.parse(localStorage.getItem('erp_grns')) || []);
   const [issues, setIssues] = useState(() => JSON.parse(localStorage.getItem('erp_issues')) || []);
-  const [toolIssues, setToolIssues] = useState(() => JSON.parse(localStorage.getItem('erp_tool_issues')) || []);
+  const [toolIssues, setToolIssues] = useState(() => {
+    try {
+      const local = localStorage.getItem('erp_tool_issues');
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(issue => !['TOL001', 'TOL002', 'TOL003', 'TOL004', 'TOL005'].includes(issue.toolId));
+        }
+      }
+    } catch (e) {
+      console.error("Error parsing tool issues", e);
+    }
+    return [];
+  });
   const [tools, setTools] = useState(() => {
     const localTools = localStorage.getItem('erp_tools');
     if (localTools) {
       try {
         const parsed = JSON.parse(localTools);
-        if (parsed) return parsed;
+        if (parsed && Array.isArray(parsed)) {
+          return parsed.filter(t => !['TOL001', 'TOL002', 'TOL003', 'TOL004', 'TOL005'].includes(t.id));
+        }
       } catch (e) {
         console.error("Error parsing tools", e);
       }
@@ -113,7 +128,7 @@ export const AppProvider = ({ children }) => {
 
   // One-time automatic purge of mock/dummy records on localhost browser
   useEffect(() => {
-    const hasPurged = localStorage.getItem('erp_purged_mock_v5');
+    const hasPurged = localStorage.getItem('erp_purged_mock_v6');
     if (!hasPurged) {
       localStorage.removeItem('erp_enquiries');
       localStorage.removeItem('erp_quotations');
@@ -122,7 +137,7 @@ export const AppProvider = ({ children }) => {
       localStorage.removeItem('erp_issues');
       localStorage.removeItem('erp_tool_issues');
       localStorage.removeItem('erp_tools');
-      localStorage.setItem('erp_purged_mock_v5', 'true');
+      localStorage.setItem('erp_purged_mock_v6', 'true');
       window.location.reload();
     }
   }, []);
