@@ -93,7 +93,7 @@ createCRUD(Project, 'projects');
 createCRUD(Vendor, 'vendors');
 
 // GRN
-router.post('/grn', protect, asyncHandler(async (req, res) => {
+router.post('/grn', protect, authorize('superadmin', 'admin', 'manager', 'staff', 'store_team'), asyncHandler(async (req, res) => {
     const { items } = req.body;
     for (const item of items) {
        await Material.findOneAndUpdate(
