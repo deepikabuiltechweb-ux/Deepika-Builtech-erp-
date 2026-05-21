@@ -25,20 +25,12 @@ export const AppProvider = ({ children }) => {
     if (localTools) {
       try {
         const parsed = JSON.parse(localTools);
-        if (parsed && parsed.length > 0) return parsed;
+        if (parsed) return parsed;
       } catch (e) {
         console.error("Error parsing tools", e);
       }
     }
-    const defaultTools = [
-      { id: 'TOL001', name: 'Welding Machine ARC-400', category: 'Machinery', totalQty: 8, availableQty: 6, repairQty: 2 },
-      { id: 'TOL002', name: 'Magnetic Core Drill Machine', category: 'Power Tools', totalQty: 5, availableQty: 5, repairQty: 0 },
-      { id: 'TOL003', name: 'Angle Grinder 4-inch', category: 'Hand Tools', totalQty: 15, availableQty: 12, repairQty: 3 },
-      { id: 'TOL004', name: 'Safety Harnesses Full Body', category: 'Safety Gear', totalQty: 50, availableQty: 48, repairQty: 2 },
-      { id: 'TOL005', name: 'Laser Distance Meter 100m', category: 'Instruments', totalQty: 6, availableQty: 6, repairQty: 0 },
-    ];
-    localStorage.setItem('erp_tools', JSON.stringify(defaultTools));
-    return defaultTools;
+    return [];
   });
   const [loading, setLoading] = useState(true);
 
@@ -121,7 +113,7 @@ export const AppProvider = ({ children }) => {
 
   // One-time automatic purge of mock/dummy records on localhost browser
   useEffect(() => {
-    const hasPurged = localStorage.getItem('erp_purged_mock_v4');
+    const hasPurged = localStorage.getItem('erp_purged_mock_v5');
     if (!hasPurged) {
       localStorage.removeItem('erp_enquiries');
       localStorage.removeItem('erp_quotations');
@@ -130,7 +122,7 @@ export const AppProvider = ({ children }) => {
       localStorage.removeItem('erp_issues');
       localStorage.removeItem('erp_tool_issues');
       localStorage.removeItem('erp_tools');
-      localStorage.setItem('erp_purged_mock_v4', 'true');
+      localStorage.setItem('erp_purged_mock_v5', 'true');
       window.location.reload();
     }
   }, []);
@@ -340,6 +332,50 @@ export const AppProvider = ({ children }) => {
     toast.success("Material Issue deleted successfully");
   };
 
+  const addTool = (tool) => {
+    const maxIdNum = tools.reduce((max, t) => {
+      const num = parseInt(t.id?.replace(/\D/g, '') || 0);
+      return num > max ? num : max;
+    }, 0);
+    const toolId = `TOL${String(maxIdNum + 1).padStart(3, '0')}`;
+    const total = parseInt(tool.totalQty) || 0;
+    const repair = parseInt(tool.repairQty) || 0;
+    const available = total - repair;
+    
+    const newTool = {
+      id: toolId,
+      name: tool.name,
+      category: tool.category,
+      totalQty: total,
+      availableQty: available,
+      repairQty: repair
+    };
+    setTools(prev => [...prev, newTool]);
+    toast.success("Tool registered successfully");
+    return newTool;
+  };
+
+  const updateTool = (id, updatedTool) => {
+    setTools(prev => prev.map(t => {
+      if (t.id === id) {
+        const total = parseInt(updatedTool.totalQty) || 0;
+        const repair = parseInt(updatedTool.repairQty) || 0;
+        const issued = t.totalQty - t.availableQty - t.repairQty;
+        const available = total - repair - issued;
+        return {
+          ...t,
+          name: updatedTool.name,
+          category: updatedTool.category,
+          totalQty: total,
+          availableQty: available,
+          repairQty: repair
+        };
+      }
+      return t;
+    }));
+    toast.success("Tool updated successfully");
+  };
+
   const deleteTool = (id) => {
     setTools(prev => prev.filter(t => t.id !== id));
     toast.success("Tool deleted successfully");
@@ -356,7 +392,7 @@ export const AppProvider = ({ children }) => {
       purchaseOrders, setPurchaseOrders, deletePurchaseOrder,
       grns, setGrns, updateStockOnGRN, deleteGRN,
       issues, setIssues, deductStockOnIssue, deleteIssue,
-      tools, setTools, deleteTool, toolIssues, setToolIssues,
+      tools, setTools, addTool, updateTool, deleteTool, toolIssues, setToolIssues,
       loading,
       isAdmin: user?.role === 'admin',
       isStoreTeam: user?.role === 'store_team' || user?.role === 'admin',
