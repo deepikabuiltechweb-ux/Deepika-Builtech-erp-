@@ -249,7 +249,7 @@ export default function StoreGRN() {
                            <td>{grn.items.length} Items</td>
                            <td>
                               <div className="flex gap-2">
-                                 <button className="p-1 text-primary hover:bg-primary-bg rounded"><Eye className="w-4 h-4" /></button>
+                                 <button onClick={() => toast("View feature coming soon", { icon: '👁️' })} className="p-1 text-primary hover:bg-primary-bg rounded"><Eye className="w-4 h-4" /></button>
                                  {isAdmin && (
                                     <button 
                                        onClick={() => {

@@ -29,6 +29,42 @@ export default function Quotations() {
     items: []
   });
 
+  const [selectedVendorsPerItem, setSelectedVendorsPerItem] = useState({});
+
+  const handleCompare = (enqId) => {
+    setSelectedEnquiryId(enqId);
+    
+    // Auto-select L1 for each item or load saved selection
+    const enqQuotes = quotations.filter(q => q.enquiryId === enqId);
+    const enquiry = enquiries.find(e => e.id === enqId);
+    let initialSelection = {};
+    if (enquiry && enqQuotes.length > 0) {
+      if (enquiry.awardedVendors && Object.keys(enquiry.awardedVendors).length > 0) {
+        initialSelection = enquiry.awardedVendors;
+      } else {
+        enquiry.items.forEach(enqItem => {
+          let l1VendorId = null;
+          let lowestPrice = Infinity;
+          enqQuotes.forEach(q => {
+             const itemQuote = q.items.find(i => i.materialId === enqItem.materialId);
+             if (itemQuote) {
+               const total = itemQuote.unitPrice * (1 + itemQuote.gst / 100);
+               if (total < lowestPrice && total > 0) {
+                 lowestPrice = total;
+                 l1VendorId = q.vendorId;
+               }
+             }
+          });
+          if (l1VendorId) {
+            initialSelection[enqItem.materialId] = l1VendorId;
+          }
+        });
+      }
+    }
+    setSelectedVendorsPerItem(initialSelection);
+    setView('comparison');
+  };
+
   const handleEnquirySelect = (enqId) => {
     const enq = enquiries.find(e => e.id === enqId);
     if (enq) {
@@ -133,10 +169,7 @@ export default function Quotations() {
                     <td>
                       <div className="flex gap-2">
                         <button 
-                          onClick={() => {
-                            setSelectedEnquiryId(quo.enquiryId);
-                            setView('comparison');
-                          }}
+                          onClick={() => handleCompare(quo.enquiryId)}
                           className="flex items-center gap-1 text-xs font-semibold text-primary px-2 py-1 bg-primary/10 rounded hover:bg-primary/20"
                         >
                           <BarChart2 className="w-3 h-3" /> Compare
@@ -342,24 +375,58 @@ export default function Quotations() {
       amount: q.items.reduce((acc, i) => acc + (i.unitPrice * i.qty * (1 + i.gst/100)), 0)
     }));
 
-    const createPO = async (quote) => {
-      const newPO = {
-        date: new Date().toISOString(),
-        vendorId: quote.vendorId,
-        enquiryId: selectedEnquiryId,
-        projectId: enquiry.projectId,
-        workOrderNo: enquiry.workOrderNo,
-        items: quote.items.map(item => ({
-          ...item,
-          itemCode: item.materialId,
-          itemName: item.name,
-          rate: item.unitPrice,
-          gstAmt: (item.unitPrice * item.qty * item.gst / 100),
-          total: item.unitPrice * item.qty * (1 + item.gst / 100)
-        })),
-        status: 'Sent'
-      };
-      await addPurchaseOrder(newPO);
+    const createPOsForSelectedItems = async () => {
+      const vendorItemsMap = {};
+      
+      enquiry.items.forEach(enqItem => {
+         const selectedVendorId = selectedVendorsPerItem[enqItem.materialId];
+         if (selectedVendorId) {
+            if (!vendorItemsMap[selectedVendorId]) vendorItemsMap[selectedVendorId] = [];
+            
+            const quote = enqQuotes.find(q => q.vendorId === selectedVendorId);
+            const itemQuote = quote.items.find(i => i.materialId === enqItem.materialId);
+            
+            if (itemQuote) {
+                vendorItemsMap[selectedVendorId].push({
+                    ...itemQuote,
+                    qty: enqItem.qty,
+                    name: enqItem.name
+                });
+            }
+         }
+      });
+      
+      let createdCount = 0;
+      for (const [vendorId, items] of Object.entries(vendorItemsMap)) {
+          if (items.length > 0) {
+             const newPO = {
+                date: new Date().toISOString(),
+                vendorId: vendorId,
+                enquiryId: selectedEnquiryId,
+                projectId: enquiry.projectId,
+                workOrderNo: enquiry.workOrderNo,
+                items: items.map(item => ({
+                  ...item,
+                  itemCode: item.materialId,
+                  itemName: item.name,
+                  rate: item.unitPrice,
+                  gstAmt: (item.unitPrice * item.qty * item.gst / 100),
+                  total: item.unitPrice * item.qty * (1 + item.gst / 100)
+                })),
+                status: 'Sent'
+             };
+             await addPurchaseOrder(newPO);
+             createdCount++;
+          }
+      }
+
+      if (createdCount > 0) {
+          await updateEnquiry(selectedEnquiryId, { awardedVendors: selectedVendorsPerItem, status: 'PO Generated' });
+          toast.success(`${createdCount} Purchase Order(s) generated successfully!`);
+          setView('list');
+      } else {
+          toast.error("No items selected to generate PO.");
+      }
     };
 
     return (
@@ -370,13 +437,16 @@ export default function Quotations() {
             <h2 className="text-2xl font-bold">Comparison Statement: {selectedEnquiryId}</h2>
           </div>
           <div className="flex gap-3">
-             <button className="btn-primary bg-white text-primary border border-primary hover:bg-primary-bg">Print Comparison</button>
+             <button onClick={() => window.print()} className="btn-primary bg-white text-primary border border-primary hover:bg-primary-bg no-print">Print Comparison</button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="card lg:col-span-2 overflow-x-auto">
-            <h3 className="text-lg font-semibold mb-4">Material-wise Comparison</h3>
+            <div className="flex justify-between items-end mb-4">
+              <h3 className="text-lg font-semibold">Material-wise Comparison</h3>
+              <span className="text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded">Click cells to select winning vendor per item</span>
+            </div>
             <table className="erp-table">
               <thead>
                 <tr>
@@ -409,10 +479,28 @@ export default function Quotations() {
                        if (rank === 1) bgColor = "bg-warning/20 text-warning";
                        if (rank === 2) bgColor = "bg-orange-100 text-orange-600";
                        
+                       const isSelected = selectedVendorsPerItem[item.materialId] === vp.vendorId;
+                       const handleSelect = () => {
+                         setSelectedVendorsPerItem(prev => ({...prev, [item.materialId]: vp.vendorId}));
+                       };
+
                        return (
                          <React.Fragment key={vidx}>
-                           <td className={cn("text-right border-l", bgColor)}>₹{vp.unitPrice.toLocaleString()}</td>
-                           <td className={cn("text-right", bgColor)}>₹{(vp.total * item.qty).toLocaleString()}</td>
+                           <td 
+                             className={cn("text-right border-l cursor-pointer relative transition-all", bgColor, isSelected && "ring-2 ring-primary ring-inset shadow-inner bg-primary/5")} 
+                             onClick={handleSelect}
+                           >
+                             <div className="flex items-center justify-between gap-1">
+                               <input type="radio" checked={isSelected} readOnly className="w-3 h-3 text-primary pointer-events-none" />
+                               <span>₹{vp.unitPrice.toLocaleString()}</span>
+                             </div>
+                           </td>
+                           <td 
+                             className={cn("text-right cursor-pointer transition-all", bgColor, isSelected && "ring-2 ring-primary ring-inset shadow-inner bg-primary/5")}
+                             onClick={handleSelect}
+                           >
+                             ₹{(vp.total * item.qty).toLocaleString()}
+                           </td>
                          </React.Fragment>
                        );
                     })}
@@ -441,20 +529,45 @@ export default function Quotations() {
             </div>
             <div className="mt-6 space-y-4">
                <h4 className="font-semibold text-sm">Decision Panel</h4>
-               {enqQuotes.map(q => (
-                 <div key={q.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
-                   <div>
-                     <p className="text-sm font-bold">{vendors.find(v => v.id === q.vendorId)?.name}</p>
-                     <p className="text-xs text-text-gray">Score: {(vendors.find(v => v.id === q.vendorId)?.rating * 20).toFixed(0)}% Perf.</p>
-                   </div>
-                   <button 
-                    onClick={() => createPO(q)}
-                    className="px-3 py-1 bg-primary text-white text-xs rounded hover:bg-primary-dark transition-colors flex items-center gap-1"
-                   >
-                     Create PO
-                   </button>
-                 </div>
-               ))}
+               <div className="p-4 border border-border rounded-lg bg-gray-50 dark:bg-gray-800">
+                  <p className="text-sm font-medium mb-3 text-text-dark">Selected PO Distribution:</p>
+                  <div className="space-y-2 mb-4">
+                     {enqQuotes.map(q => {
+                       const selectedItemCount = enquiry.items.filter(i => selectedVendorsPerItem[i.materialId] === q.vendorId).length;
+                       if (selectedItemCount === 0) return null;
+                       return (
+                         <div key={q.id} className="flex justify-between items-center text-sm py-1 border-b border-border/50 last:border-0">
+                           <span className="font-medium text-text-gray">{vendors.find(v => v.id === q.vendorId)?.name}</span>
+                           <span className="font-bold text-primary">{selectedItemCount} Item(s)</span>
+                         </div>
+                       );
+                     })}
+                     {enquiry.items.filter(i => !selectedVendorsPerItem[i.materialId]).length > 0 && (
+                         <div className="flex justify-between items-center text-sm py-1 text-warning">
+                           <span>Unassigned Items</span>
+                           <span className="font-bold">{enquiry.items.filter(i => !selectedVendorsPerItem[i.materialId]).length} Item(s)</span>
+                         </div>
+                     )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button 
+                     onClick={async () => {
+                       await updateEnquiry(selectedEnquiryId, { awardedVendors: selectedVendorsPerItem });
+                       toast.success("Vendor selection saved successfully!");
+                     }}
+                     className="w-full py-2 bg-white text-primary border border-primary text-sm font-semibold rounded hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
+                    >
+                      Save Selection
+                    </button>
+                    <button 
+                     onClick={createPOsForSelectedItems}
+                     className="w-full py-2 bg-primary text-white text-sm font-semibold rounded hover:bg-primary-dark transition-colors flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Generate Selected PO(s)
+                    </button>
+                  </div>
+               </div>
             </div>
           </div>
         </div>

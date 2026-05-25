@@ -8,6 +8,7 @@ const enquirySchema = new mongoose.Schema({
   requiredDate: { type: String },
   items: { type: mongoose.Schema.Types.Mixed },
   selectedVendors: { type: [String] },
+  awardedVendors: { type: mongoose.Schema.Types.Mixed },
   status: { type: String, default: 'Open' }
 }, { timestamps: true });
 

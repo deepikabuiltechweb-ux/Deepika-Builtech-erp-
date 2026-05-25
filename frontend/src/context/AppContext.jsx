@@ -659,10 +659,10 @@ export const AppProvider = ({ children }) => {
       tools, setTools, addTool, updateTool, deleteTool,
       toolIssues, setToolIssues, addToolIssue, updateToolIssue, deleteToolIssue,
       loading,
-      isAdmin: user?.role === 'admin',
-      isStoreTeam: user?.role === 'store_team' || user?.role === 'admin',
-      isPurchaseTeam: user?.role === 'purchase_team' || user?.role === 'admin',
-      canEdit: user?.role === 'admin' || user?.role === 'store_team' || user?.role === 'purchase_team' || user?.role === 'staff',
+      isAdmin: user?.role === 'admin' || user?.role === 'superadmin',
+      isStoreTeam: user?.role === 'store_team' || user?.role === 'admin' || user?.role === 'superadmin',
+      isPurchaseTeam: user?.role === 'purchase_team' || user?.role === 'admin' || user?.role === 'superadmin',
+      canEdit: user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'store_team' || user?.role === 'purchase_team' || user?.role === 'staff',
       isViewer: user?.role === 'viewer'
     }}>
       {children}
