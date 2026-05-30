@@ -17,6 +17,7 @@ import Projects from './pages/Projects';
 import Vendors from './pages/Vendors';
 import MaterialMaster from './pages/MaterialMaster';
 import Reports from './pages/Reports';
+import EmergencyDC from './pages/EmergencyDC';
 
 function App() {
   const { user, loading } = useApp();
@@ -50,6 +51,7 @@ function App() {
           <Route path="/vendors" element={<Vendors />} />
           <Route path="/material-master" element={<MaterialMaster />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/emergency-dc" element={<EmergencyDC />} />
         </Routes>
       </Layout>
     </Router>

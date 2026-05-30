@@ -10,6 +10,7 @@ import GRN from '../models/GRN.js';
 import Issue from '../models/Issue.js';
 import Tool from '../models/Tool.js';
 import ToolIssue from '../models/ToolIssue.js';
+import EmergencyDC from '../models/EmergencyDC.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { cache, clearCache } from '../middleware/cache.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -105,6 +106,23 @@ createCRUD(GRN, 'grns');
 createCRUD(Issue, 'issues');
 createCRUD(Tool, 'tools');
 createCRUD(ToolIssue, 'toolissues');
+createCRUD(EmergencyDC, 'emergencydcs');
+
+// Emergency DC - Approve / Reject
+router.patch('/emergencydcs/:id/status', protect, authorize('superadmin', 'admin', 'manager'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  let updated = await EmergencyDC.findOneAndUpdate({ id }, { status }, { new: true });
+  if (!updated && mongoose.Types.ObjectId.isValid(id)) {
+    updated = await EmergencyDC.findByIdAndUpdate(id, { status }, { new: true });
+  }
+  if (!updated) {
+    res.status(404);
+    throw new Error('Emergency DC not found');
+  }
+  await clearCache('/api/v1/emergencydcs');
+  res.status(200).json(new ApiResponse(200, updated, `DC ${status} successfully`));
+}));
 
 // GRN
 router.post('/grn', protect, authorize('superadmin', 'admin', 'manager', 'staff', 'store_team'), asyncHandler(async (req, res) => {

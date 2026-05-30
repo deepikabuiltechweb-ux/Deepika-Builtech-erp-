@@ -21,6 +21,7 @@ export const AppProvider = ({ children }) => {
   const [issues, setIssues] = useState([]);
   const [toolIssues, setToolIssues] = useState([]);
   const [tools, setTools] = useState([]);
+  const [emergencyDCs, setEmergencyDCs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,6 +66,7 @@ export const AppProvider = ({ children }) => {
     setIssues([]);
     setTools([]);
     setToolIssues([]);
+    setEmergencyDCs([]);
     toast.success("Logged out successfully");
   };
 
@@ -77,7 +79,7 @@ export const AppProvider = ({ children }) => {
     }
 
     try {
-      const [mats, projs, vends, enqs, quts, pos, grnList, issList, toolList, toolIssList] = await Promise.all([
+      const [mats, projs, vends, enqs, quts, pos, grnList, issList, toolList, toolIssList, dcList] = await Promise.all([
         axios.get(`${API_BASE_URL}/materials`),
         axios.get(`${API_BASE_URL}/projects`),
         axios.get(`${API_BASE_URL}/vendors`),
@@ -87,7 +89,8 @@ export const AppProvider = ({ children }) => {
         axios.get(`${API_BASE_URL}/grns`),
         axios.get(`${API_BASE_URL}/issues`),
         axios.get(`${API_BASE_URL}/tools`),
-        axios.get(`${API_BASE_URL}/toolissues`)
+        axios.get(`${API_BASE_URL}/toolissues`),
+        axios.get(`${API_BASE_URL}/emergencydcs`)
       ]);
 
       setMaterials(mats.data.data || mats.data);
@@ -100,6 +103,7 @@ export const AppProvider = ({ children }) => {
       setIssues(issList.data.data || issList.data);
       setTools(toolList.data.data || toolList.data);
       setToolIssues(toolIssList.data.data || toolIssList.data);
+      setEmergencyDCs(dcList.data.data || dcList.data);
       
       setLoading(false);
     } catch (error) {
@@ -601,6 +605,55 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // --- Emergency DC Functions ---
+  const addEmergencyDC = async (dc) => {
+    try {
+      const maxIdNum = emergencyDCs.reduce((max, d) => {
+        const num = parseInt(d.id?.replace(/\D/g, '') || 0);
+        return num > max ? num : max;
+      }, 0);
+      const dcId = `EDC-${String(maxIdNum + 1).padStart(4, '0')}`;
+      const newDC = { ...dc, id: dcId, status: 'Pending Approval' };
+      const response = await axios.post(`${API_BASE_URL}/emergencydcs`, newDC);
+      setEmergencyDCs(prev => [response.data.data || response.data, ...prev]);
+      toast.success(`Emergency DC ${dcId} created!`);
+      return response.data.data || response.data;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to create Emergency DC");
+      return false;
+    }
+  };
+
+  const updateEmergencyDCStatus = async (id, status) => {
+    try {
+      const existing = emergencyDCs.find(d => d.id === id || d._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      const response = await axios.patch(`${API_BASE_URL}/emergencydcs/${dbId}/status`, { status });
+      setEmergencyDCs(prev => prev.map(d => (d.id === id || d._id === id) ? (response.data.data || response.data) : d));
+      toast.success(`DC ${status}`);
+      return response.data.data || response.data;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to update DC status");
+      return false;
+    }
+  };
+
+  const deleteEmergencyDC = async (id) => {
+    try {
+      const existing = emergencyDCs.find(d => d.id === id || d._id === id);
+      if (!existing) return;
+      const dbId = existing._id || existing.id;
+      await axios.delete(`${API_BASE_URL}/emergencydcs/${dbId}`);
+      setEmergencyDCs(prev => prev.filter(d => d.id !== id && d._id !== id));
+      toast.success("Emergency DC deleted");
+      return true;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to delete Emergency DC");
+      return false;
+    }
+  };
+
   // --- Tool Issue Functions ---
   const addToolIssue = async (toolIssue) => {
     try {
@@ -658,6 +711,7 @@ export const AppProvider = ({ children }) => {
       issues, setIssues, addIssue, updateIssue, deleteIssue, deductStockOnIssue,
       tools, setTools, addTool, updateTool, deleteTool,
       toolIssues, setToolIssues, addToolIssue, updateToolIssue, deleteToolIssue,
+      emergencyDCs, setEmergencyDCs, addEmergencyDC, updateEmergencyDCStatus, deleteEmergencyDC,
       loading,
       isAdmin: user?.role === 'admin' || user?.role === 'superadmin',
       isStoreTeam: user?.role === 'store_team' || user?.role === 'admin' || user?.role === 'superadmin',

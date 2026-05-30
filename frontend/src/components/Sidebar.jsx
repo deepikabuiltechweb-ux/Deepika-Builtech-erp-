@@ -18,7 +18,8 @@ import {
   ShieldCheck,
   Store,
   DownloadCloud,
-  Eye
+  Eye,
+  AlertTriangle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { clsx } from 'clsx';
@@ -83,6 +84,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     { path: '/vendors', label: 'Vendors', icon: Users, roles: ['admin', 'staff', 'purchase_team'] },
     { path: '/material-master', label: 'Material Master', icon: Database, roles: ['admin', 'staff', 'purchase_team'] },
     { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'staff', 'viewer', 'store_team', 'purchase_team'] },
+    { path: '/emergency-dc', label: 'Emergency DC', icon: AlertTriangle, roles: ['admin', 'purchase_team'] },
   ];
 
   const navItems = allNavItems.filter(item => item.roles.includes(user?.role));
