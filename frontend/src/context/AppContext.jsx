@@ -24,15 +24,89 @@ export const AppProvider = ({ children }) => {
   const [emergencyDCs, setEmergencyDCs] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ── Request interceptor: attach access token to every request ──
   useEffect(() => {
-    const interceptor = axios.interceptors.request.use(config => {
+    const reqInterceptor = axios.interceptors.request.use(config => {
       const token = localStorage.getItem('erp_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
     });
-    return () => axios.interceptors.request.eject(interceptor);
+
+    // ── Response interceptor: silently refresh on 401 and retry ──
+    let isRefreshing = false;
+    let failedQueue = [];
+
+    const processQueue = (error, token = null) => {
+      failedQueue.forEach(prom => {
+        if (error) prom.reject(error);
+        else prom.resolve(token);
+      });
+      failedQueue = [];
+    };
+
+    const resInterceptor = axios.interceptors.response.use(
+      res => res,
+      async error => {
+        const originalRequest = error.config;
+        // Only attempt refresh on 401, skip auth routes to avoid loops
+        if (
+          error.response?.status === 401 &&
+          !originalRequest._retry &&
+          !originalRequest.url?.includes('/auth/')
+        ) {
+          if (isRefreshing) {
+            // Queue requests while refresh is in progress
+            return new Promise((resolve, reject) => {
+              failedQueue.push({ resolve, reject });
+            }).then(token => {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              return axios(originalRequest);
+            }).catch(err => Promise.reject(err));
+          }
+
+          originalRequest._retry = true;
+          isRefreshing = true;
+
+          const refreshToken = localStorage.getItem('erp_refresh_token');
+          if (!refreshToken) {
+            isRefreshing = false;
+            logout();
+            return Promise.reject(error);
+          }
+
+          try {
+            const { data } = await axios.post(
+              `${API_BASE_URL}/auth/refresh`,
+              {},
+              { headers: { Authorization: `Bearer ${refreshToken}` } }
+            );
+            const newToken = data.token;
+            localStorage.setItem('erp_token', newToken);
+            if (data.refreshToken) {
+              localStorage.setItem('erp_refresh_token', data.refreshToken);
+            }
+            axios.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+            processQueue(null, newToken);
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return axios(originalRequest);
+          } catch (refreshError) {
+            processQueue(refreshError, null);
+            logout();
+            return Promise.reject(refreshError);
+          } finally {
+            isRefreshing = false;
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.request.eject(reqInterceptor);
+      axios.interceptors.response.eject(resInterceptor);
+    };
   }, []);
 
   // Auth Functions
@@ -43,8 +117,11 @@ export const AppProvider = ({ children }) => {
       setUser(safeUserData);
       localStorage.setItem('erp_user', JSON.stringify(safeUserData));
       localStorage.setItem('erp_token', data.token);
+      if (data.refreshToken) {
+        localStorage.setItem('erp_refresh_token', data.refreshToken);
+      }
       toast.success(`Welcome back, ${data.name}!`);
-      fetchData(); // Fetch data immediately after successful login
+      fetchData();
       return true;
     } catch (error) {
       toast.error(error.response?.data?.message || "Login failed");
@@ -56,6 +133,7 @@ export const AppProvider = ({ children }) => {
     setUser(null);
     localStorage.removeItem('erp_user');
     localStorage.removeItem('erp_token');
+    localStorage.removeItem('erp_refresh_token');
     setMaterials([]);
     setProjects([]);
     setVendors([]);

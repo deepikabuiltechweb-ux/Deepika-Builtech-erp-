@@ -16,8 +16,8 @@ const loginLimiter = rateLimit({
 });
 
 const generateTokens = (id) => {
-  const accessToken = jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '15m' });
-  const refreshToken = jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  const accessToken = jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  const refreshToken = jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
   return { accessToken, refreshToken };
 };
 
@@ -86,6 +86,56 @@ router.post('/logout', (req, res) => {
   res.clearCookie('refreshToken');
   res.status(200).json(new ApiResponse(200, null, 'Logged out successfully'));
 });
+
+// Refresh Token route — accepts refresh token from Authorization header or cookie
+router.post('/refresh', asyncHandler(async (req, res) => {
+  // Accept token from Authorization header (Bearer) or cookie
+  let refreshToken = req.cookies?.refreshToken;
+  if (!refreshToken && req.headers.authorization?.startsWith('Bearer')) {
+    refreshToken = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!refreshToken) {
+    res.status(401);
+    throw new Error('No refresh token provided');
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+  } catch {
+    res.status(401);
+    throw new Error('Refresh token invalid or expired. Please log in again.');
+  }
+
+  const user = await User.findById(decoded.id).select('-password');
+  if (!user) {
+    res.status(401);
+    throw new Error('User not found');
+  }
+
+  const { accessToken: newAccessToken, refreshToken: newRefreshToken } = generateTokens(user._id);
+  user.refreshToken = newRefreshToken;
+  await user.save();
+
+  res.cookie('accessToken', newAccessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+  res.cookie('refreshToken', newRefreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  });
+
+  res.status(200).json({
+    token: newAccessToken,
+    refreshToken: newRefreshToken,
+  });
+}));
 
 // Update Profile route
 router.put('/profile', protect, asyncHandler(async (req, res) => {
