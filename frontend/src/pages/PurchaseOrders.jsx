@@ -41,6 +41,82 @@ export default function PurchaseOrders() {
   const [editingId, setEditingId] = useState(null);
 
   // --- Form State ---
+  const defaultDispatchFields = {
+    companyName: 'DEEPIKA BUILTECH ENGINEERING',
+    addrLine1: 'Survey No.44/5, Rajakulam Road,',
+    addrLine2: 'Vaivayur Post, Karur Village, Kanchipuram - 631 561',
+    cityPin: '',
+    gstin: '33AEGPL3660M1ZC',
+  };
+
+  const buildDispatchString = (fields) =>
+    [fields.companyName, fields.addrLine1, fields.addrLine2, fields.cityPin, fields.gstin ? `GSTIN: ${fields.gstin}` : '']
+      .filter(Boolean)
+      .join('\n');
+
+  const parseDispatchString = (str) => {
+    if (!str) return { ...defaultDispatchFields };
+    const lines = str.split('\n').map(l => l.trim()).filter(Boolean);
+    const gstinLine = lines.find(l => l.toUpperCase().startsWith('GSTIN'));
+    const rest = lines.filter(l => !l.toUpperCase().startsWith('GSTIN'));
+    return {
+      companyName: rest[0] || '',
+      addrLine1: rest[1] || '',
+      addrLine2: rest[2] || '',
+      cityPin: rest[3] || '',
+      gstin: gstinLine ? gstinLine.replace(/GSTIN\s*:\s*/i, '').trim() : '',
+    };
+  };
+
+  const [dispatchFields, setDispatchFields] = useState({ ...defaultDispatchFields });
+  const [savedDispatchAddresses, setSavedDispatchAddresses] = useState(() => {
+    try {
+      const stored = localStorage.getItem('erp_dispatch_addresses');
+      const parsed = stored ? JSON.parse(stored) : [];
+      const def = buildDispatchString(defaultDispatchFields);
+      return parsed.includes(def) ? parsed : [def, ...parsed];
+    } catch {
+      return [buildDispatchString(defaultDispatchFields)];
+    }
+  });
+  const [showDispatchDropdown, setShowDispatchDropdown] = useState(false);
+  const [dispatchDropdownSearch, setDispatchDropdownSearch] = useState('');
+
+  const saveDispatchAddress = (addr) => {
+    if (!addr.trim() || savedDispatchAddresses.includes(addr)) return;
+    const updated = [...savedDispatchAddresses, addr];
+    setSavedDispatchAddresses(updated);
+    try { localStorage.setItem('erp_dispatch_addresses', JSON.stringify(updated)); } catch {}
+  };
+
+  const deleteDispatchAddress = (addr) => {
+    const def = buildDispatchString(defaultDispatchFields);
+    if (addr === def) return; // Don't allow deleting default
+    const updated = savedDispatchAddresses.filter(a => a !== addr);
+    setSavedDispatchAddresses(updated);
+    try { localStorage.setItem('erp_dispatch_addresses', JSON.stringify(updated)); } catch {}
+  };
+
+  const applyDispatchAddress = (addr) => {
+    const fields = parseDispatchString(addr);
+    setDispatchFields(fields);
+    setForm(f => ({ ...f, dispatchTo: addr }));
+    setShowDispatchDropdown(false);
+    setDispatchDropdownSearch('');
+  };
+
+  const handleDispatchFieldChange = (field, value) => {
+    const updated = { ...dispatchFields, [field]: value };
+    setDispatchFields(updated);
+    setForm(f => ({ ...f, dispatchTo: buildDispatchString(updated) }));
+  };
+
+  const currentDispatchString = buildDispatchString(dispatchFields);
+  const isNewDispatchAddress = currentDispatchString.trim() && !savedDispatchAddresses.includes(currentDispatchString);
+  const filteredSavedAddresses = savedDispatchAddresses.filter(a =>
+    !dispatchDropdownSearch || a.toLowerCase().includes(dispatchDropdownSearch.toLowerCase())
+  );
+
   const [form, setForm] = useState({
     vendorId: '',
     projectId: '',
@@ -49,14 +125,13 @@ export default function PurchaseOrders() {
     deliveryDate: '',
     status: 'Sent',
     items: [emptyItem()],
-    dispatchTo: 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC',
+    dispatchTo: buildDispatchString(defaultDispatchFields),
     deliveryTerms: format(new Date(), 'yyyy-MM-dd'),
     paymentTerms: '45 Days Credit',
     remarks: '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
     reference: 'WHATSAPP',
   });
   const [submitting, setSubmitting] = useState(false);
-  const [showDispatchSuggestions, setShowDispatchSuggestions] = useState(false);
 
   const handleAddNewVendor = async (name) => {
     const newVend = await addVendor({
@@ -84,21 +159,6 @@ export default function PurchaseOrders() {
     }
   };
 
-  const uniqueDispatchAddresses = Array.from(new Set(
-    purchaseOrders
-      .map(po => po.dispatchTo)
-      .filter(addr => addr && addr.trim() !== '')
-  ));
-  
-  const defaultAddress = 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC';
-  
-  const dispatchSuggestions = uniqueDispatchAddresses.includes(defaultAddress)
-    ? uniqueDispatchAddresses
-    : [defaultAddress, ...uniqueDispatchAddresses];
-
-  const filteredDispatchSuggestions = dispatchSuggestions.filter(addr => 
-    addr.toLowerCase().includes((form.dispatchTo || '').toLowerCase())
-  );
 
   // ─── PDF Generator ────────────────────────────────────────────────────────
   const generatePDF = (po) => {
@@ -111,21 +171,21 @@ export default function PurchaseOrders() {
       const numberToWords = (num) => {
         const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
         const b = ['', '', 'Twenty ', 'Thirty ', 'Forty ', 'Fifty ', 'Sixty ', 'Seventy ', 'Eighty ', 'Ninety '];
-        
+
         const numStr = Math.round(num).toString();
         if (Math.round(num) === 0) return 'Zero Only';
         if (numStr.length > 9) return 'Amount too large';
-        
+
         const n = ('000000000' + numStr).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
         if (!n) return '';
-        
+
         let str = '';
         str += Number(n[1]) !== 0 ? (a[Number(n[1])] || b[n[1][0]] + a[n[1][1]]) + 'Crore ' : '';
         str += Number(n[2]) !== 0 ? (a[Number(n[2])] || b[n[2][0]] + a[n[2][1]]) + 'Lakh ' : '';
         str += Number(n[3]) !== 0 ? (a[Number(n[3])] || b[n[3][0]] + a[n[3][1]]) + 'Thousand ' : '';
         str += Number(n[4]) !== 0 ? a[Number(n[4])] + 'Hundred ' : '';
         str += Number(n[5]) !== 0 ? ((str !== '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + a[n[5][1]]) : '';
-        
+
         return str.trim() + ' Only';
       };
 
@@ -185,11 +245,11 @@ export default function PurchaseOrders() {
       doc.setFont('helvetica', 'bold');
       doc.text(`M/S;   ${vendor?.name?.toUpperCase() || 'BHAGWATI STEEL AND ALLOYS PVT.LTD'}`, 13, 74.5);
       doc.setFont('helvetica', 'normal');
-      
+
       const addr = vendor?.address || 'No. 15, Ponniamman Nagar Road, Chennai - 600095';
       const addrLines = doc.splitTextToSize(addr, 74);
       doc.text(addrLines[0] || '', 13, 78);
-      
+
       doc.text(`MAIL:  ${vendor?.email || 'pradeepgs1@yahoo.com'}`, 13, 81.5);
       doc.text(`GSTIN:  ${vendor?.gstin || '33AAGCB5988F1ZH'}`, 13, 85);
       doc.text(`CONT:  ${vendor?.contact || 'ASHISH AGARWAL (9841160237)'}`, 13, 88.5);
@@ -234,7 +294,7 @@ export default function PurchaseOrders() {
       doc.setFont('helvetica', 'bold');
       doc.text('DELIVERY:', 93, 55);
       doc.setFont('helvetica', 'normal');
-      
+
       let deliveryText = po.deliveryTerms || 'Within a Days';
       if (deliveryText && (
         /^\d{4}-\d{2}-\d{2}$/.test(deliveryText) || /^\d{4}-\d{2}-\d{2}T/.test(deliveryText)
@@ -373,6 +433,7 @@ export default function PurchaseOrders() {
   const removeItem = (idx) => setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
 
   const resetForm = () => {
+    setDispatchFields({ ...defaultDispatchFields });
     setForm({
       vendorId: '',
       projectId: '',
@@ -381,7 +442,7 @@ export default function PurchaseOrders() {
       deliveryDate: '',
       status: 'Sent',
       items: [emptyItem()],
-      dispatchTo: 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC',
+      dispatchTo: buildDispatchString(defaultDispatchFields),
       deliveryTerms: format(new Date(), 'yyyy-MM-dd'),
       paymentTerms: '45 Days Credit',
       remarks: '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
@@ -398,19 +459,19 @@ export default function PurchaseOrders() {
       date: po.date ? format(new Date(po.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
       deliveryDate: po.deliveryDate ? format(new Date(po.deliveryDate), 'yyyy-MM-dd') : '',
       status: po.status || 'Sent',
-      items: po.items && po.items.length > 0 
+      items: po.items && po.items.length > 0
         ? po.items.map(item => ({
-            itemCode: item.itemCode || '',
-            itemName: item.itemName || '',
-            qty: item.qty || 1,
-            unit: item.unit || 'Nos',
-            rate: item.rate || 0,
-            gst: item.gst || 18,
-            gstAmt: item.gstAmt || 0,
-            total: item.total || 0,
-          }))
+          itemCode: item.itemCode || '',
+          itemName: item.itemName || '',
+          qty: item.qty || 1,
+          unit: item.unit || 'Nos',
+          rate: item.rate || 0,
+          gst: item.gst || 18,
+          gstAmt: item.gstAmt || 0,
+          total: item.total || 0,
+        }))
         : [emptyItem()],
-      dispatchTo: po.dispatchTo || 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC',
+      dispatchTo: po.dispatchTo || buildDispatchString(defaultDispatchFields),
       deliveryTerms: po.deliveryTerms ? (
         /^\d{4}-\d{2}-\d{2}$/.test(po.deliveryTerms) || /^\d{4}-\d{2}-\d{2}T/.test(po.deliveryTerms)
           ? format(new Date(po.deliveryTerms), 'yyyy-MM-dd')
@@ -420,6 +481,7 @@ export default function PurchaseOrders() {
       remarks: po.remarks || '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
       reference: po.reference || 'WHATSAPP',
     });
+    setDispatchFields(parseDispatchString(po.dispatchTo || buildDispatchString(defaultDispatchFields)));
     setShowForm(true);
   };
 
@@ -429,7 +491,7 @@ export default function PurchaseOrders() {
     if (!form.projectId) return toast.error('Please select a project.');
     if (form.items.some(it => !it.itemName.trim())) return toast.error('All items must have a name.');
     setSubmitting(true);
-    
+
     let result;
     if (editingId) {
       result = await updatePurchaseOrder(editingId, { ...form, date: new Date(form.date).toISOString() });
@@ -439,7 +501,7 @@ export default function PurchaseOrders() {
     } else {
       result = await addPurchaseOrder({ ...form, date: new Date(form.date).toISOString() });
     }
-    
+
     setSubmitting(false);
     if (result) {
       setShowForm(false);
@@ -458,19 +520,19 @@ export default function PurchaseOrders() {
   const emailVendor = async (po) => {
     const vendor = vendors.find(v => v.id === po.vendorId);
     let email = vendor?.email;
-    
+
     if (!email || email === 'N/A' || !email.trim()) {
       const inputEmail = window.prompt(`No email address found for vendor "${vendor?.name || 'Unknown'}".\nPlease enter a valid email address:`);
       if (inputEmail === null) return; // User cancelled prompt
-      
+
       const cleanEmail = inputEmail.trim();
       if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
         toast.error("Please enter a valid email address.");
         return;
       }
-      
+
       email = cleanEmail;
-      
+
       // Persist the entered email back to the database and state
       if (vendor) {
         try {
@@ -686,7 +748,7 @@ export default function PurchaseOrders() {
                         'badge',
                         po.status === 'Sent' ? 'badge-primary'
                           : po.status === 'Partial' ? 'badge-warning'
-                          : 'badge-success'
+                            : 'badge-success'
                       )}>
                         {po.status}
                       </span>
@@ -848,35 +910,107 @@ export default function PurchaseOrders() {
               </div>
 
               {/* Shipping & Dispatch Address */}
-              <div className="card space-y-1 relative">
-                <label className="text-sm font-medium text-text-dark">Dispatch / Shipped TO Address *</label>
-                <div className="relative">
-                  <textarea
-                    className="input-field w-full h-24 resize-none pl-3 pt-2 text-sm"
-                    placeholder="Enter full address details for Shipped TO..."
-                    value={form.dispatchTo}
-                    onChange={e => setForm(f => ({ ...f, dispatchTo: e.target.value }))}
-                    onFocus={() => setShowDispatchSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowDispatchSuggestions(false), 250)}
-                  />
-                  {showDispatchSuggestions && filteredDispatchSuggestions.length > 0 && (
-                    <div className="absolute z-[60] w-full mt-1 bg-white border border-border rounded-lg shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                      {filteredDispatchSuggestions.map((addr, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          className="w-full text-left px-4 py-3 hover:bg-primary-bg transition-colors border-b border-border text-xs font-medium text-text-dark whitespace-pre-line"
-                          onClick={() => {
-                            setForm(f => ({ ...f, dispatchTo: addr }));
-                            setShowDispatchSuggestions(false);
-                          }}
-                        >
-                          {addr}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              <div className="card space-y-3 relative">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-text-dark">Dispatch / Shipped TO Address *</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowDispatchDropdown(v => !v)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      Saved Addresses
+                    </button>
+                    {showDispatchDropdown && (
+                      <div className="absolute right-0 top-9 z-[70] w-80 bg-white border border-border rounded-xl shadow-2xl overflow-hidden">
+                        <div className="p-2 border-b border-border">
+                          <input
+                            type="text"
+                            placeholder="Search saved addresses..."
+                            className="input-field w-full text-xs py-1.5"
+                            value={dispatchDropdownSearch}
+                            onChange={e => setDispatchDropdownSearch(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                        <div className="max-h-52 overflow-y-auto custom-scrollbar">
+                          {filteredSavedAddresses.length === 0 ? (
+                            <p className="p-4 text-xs text-text-gray text-center italic">No saved addresses found.</p>
+                          ) : filteredSavedAddresses.map((addr, idx) => (
+                            <div key={idx} className="flex items-start gap-1 border-b border-border last:border-0 hover:bg-primary-bg transition-colors group">
+                              <button
+                                type="button"
+                                className="flex-1 text-left px-3 py-2.5 text-xs font-medium text-text-dark whitespace-pre-line"
+                                onClick={() => applyDispatchAddress(addr)}
+                              >
+                                {addr}
+                              </button>
+                              {addr !== buildDispatchString(defaultDispatchFields) && (
+                                <button
+                                  type="button"
+                                  title="Remove this address"
+                                  onClick={() => deleteDispatchAddress(addr)}
+                                  className="p-2 text-text-gray hover:text-error opacity-0 group-hover:opacity-100 transition-all mt-1 shrink-0"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {showDispatchDropdown && (
+                      <div className="fixed inset-0 z-[65]" onClick={() => { setShowDispatchDropdown(false); setDispatchDropdownSearch(''); }} />
+                    )}
+                  </div>
                 </div>
+
+                {/* Structured Address Rows */}
+                <div className="space-y-2">
+                  {[
+                    { key: 'companyName', label: 'Company / Name', placeholder: 'e.g. DEEPIKA BUILTECH ENGINEERING' },
+                    { key: 'addrLine1',   label: 'Address Line 1', placeholder: 'e.g. Survey No.44/5, Rajakulam Road,' },
+                    { key: 'addrLine2',   label: 'Address Line 2', placeholder: 'e.g. Vaivayur Post, Kanchipuram - 631 561' },
+                    { key: 'cityPin',     label: 'City / State / PIN', placeholder: 'e.g. Chennai, Tamil Nadu - 600 001' },
+                    { key: 'gstin',       label: 'GSTIN',           placeholder: 'e.g. 33AEGPL3660M1ZC' },
+                  ].map(({ key, label, placeholder }) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-text-gray uppercase tracking-wider w-32 shrink-0">{label}</span>
+                      <input
+                        className="input-field flex-1 text-sm py-1.5"
+                        type="text"
+                        placeholder={placeholder}
+                        value={dispatchFields[key]}
+                        onChange={e => handleDispatchFieldChange(key, e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Save New Address Prompt */}
+                {isNewDispatchAddress && (
+                  <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <p className="text-xs font-semibold text-amber-800">This is a new address. Save it for future use?</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => saveDispatchAddress(currentDispatchString)}
+                        className="text-xs font-bold text-success hover:underline px-2 py-1 bg-success/10 rounded"
+                      >
+                        Save Address
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => saveDispatchAddress('')}  
+                        className="text-xs text-text-gray hover:underline"
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Terms & Conditions */}
