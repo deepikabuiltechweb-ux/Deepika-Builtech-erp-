@@ -412,8 +412,8 @@ export const AppProvider = ({ children }) => {
       const maxIdNum = purchaseOrders.reduce((max, p) => {
         const num = parseInt(p.id?.replace(/\D/g, '') || 0);
         return num > max ? num : max;
-      }, 0);
-      const poId = `PO-2024-${String(maxIdNum + 1).padStart(3, '0')}`;
+      }, 22); // Starts from 22 so first PO becomes PO-023
+      const poId = `PO-${String(maxIdNum + 1).padStart(3, '0')}`;
       const newPO = { ...po, id: poId };
       const response = await axios.post(`${API_BASE_URL}/purchaseorders`, newPO);
       setPurchaseOrders(prev => [...prev, response.data.data || response.data]);

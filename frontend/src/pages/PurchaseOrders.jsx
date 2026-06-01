@@ -53,6 +53,7 @@ export default function PurchaseOrders() {
     deliveryTerms: format(new Date(), 'yyyy-MM-dd'),
     paymentTerms: '45 Days Credit',
     remarks: '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
+    reference: 'WHATSAPP',
   });
   const [submitting, setSubmitting] = useState(false);
   const [showDispatchSuggestions, setShowDispatchSuggestions] = useState(false);
@@ -222,7 +223,7 @@ export default function PurchaseOrders() {
       doc.line(90, 45, 200, 45);
       doc.line(145, 38, 145, 45);
       doc.setFont('helvetica', 'normal');
-      doc.text('WHATSAPP', 105, 42.5);
+      doc.text(po.reference || 'WHATSAPP', 105, 42.5);
       doc.text(`DBTE - ${po.workOrderNo || '202'}`, 160, 42.5);
 
       // Row 3: Terms Header
@@ -333,12 +334,12 @@ export default function PurchaseOrders() {
       doc.setFont('helvetica', 'bold');
       doc.text(numberToWords(grandTotal), 13, finalY + 5);
 
-      // 5. Signature Section
-      const sigY = finalY + 25;
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.text('For DEEPIKA BUILTECH ENGINEERING', 200, sigY, { align: 'right' });
-      doc.text('Authorised Signatory', 200, sigY + 22, { align: 'right' });
+      // 5. Signature / Footer Section
+      const sigY = finalY + 22;
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(100, 100, 100);
+      doc.text('This is a computer generated document, hence signature is not required.', 105, sigY, { align: 'center' });
 
       doc.save(`${po.id}.pdf`);
       toast.success('PO PDF downloaded in official format!');
@@ -384,6 +385,7 @@ export default function PurchaseOrders() {
       deliveryTerms: format(new Date(), 'yyyy-MM-dd'),
       paymentTerms: '45 Days Credit',
       remarks: '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
+      reference: 'WHATSAPP',
     });
   };
 
@@ -416,6 +418,7 @@ export default function PurchaseOrders() {
       ) : format(new Date(), 'yyyy-MM-dd'),
       paymentTerms: po.paymentTerms || '45 Days Credit',
       remarks: po.remarks || '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
+      reference: po.reference || 'WHATSAPP',
     });
     setShowForm(true);
   };
@@ -478,9 +481,9 @@ export default function PurchaseOrders() {
       }
     }
 
-    const subject = encodeURIComponent(`Purchase Order ${po.id} – Deepika Builtech Pvt. Ltd.`);
+    const subject = encodeURIComponent(`Purchase Order ${po.id} – Deepika Builtech Engineering`);
     const body = encodeURIComponent(
-      `Dear ${vendor?.name || 'Vendor'},\n\nPlease find enclosed Purchase Order ${po.id} dated ${format(new Date(po.date), 'dd-MM-yyyy')}.\n\nKindly acknowledge receipt and confirm delivery schedule.\n\nRegards,\nDeepika Builtech Private Limited`
+      `Dear ${vendor?.name || 'Vendor'},\n\nPlease find enclosed Purchase Order ${po.id} dated ${format(new Date(po.date), 'dd-MM-yyyy')}.\n\nKindly acknowledge receipt and confirm delivery schedule.\n\nRegards,\nDeepika Builtech Engineering`
     );
     window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
   };
@@ -529,6 +532,7 @@ export default function PurchaseOrders() {
             <h3 className="font-bold text-primary border-b pb-2 uppercase tracking-wide text-sm">Project Details</h3>
             <p className="text-lg font-bold">{project?.name}</p>
             <p className="text-sm text-text-gray">Work Order No: {selectedPO.workOrderNo}</p>
+            <p className="text-sm text-text-gray">Buyer's Ref / Reference: {selectedPO.reference || 'WHATSAPP'}</p>
             {selectedPO.deliveryDate && (
               <p className="text-sm text-text-gray">
                 Expected Delivery: {format(new Date(selectedPO.deliveryDate), 'dd-MM-yyyy')}
@@ -830,6 +834,16 @@ export default function PurchaseOrders() {
                     <option value="Received">Received</option>
                     <option value="Cancelled">Cancelled</option>
                   </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-text-dark">Buyer's Ref / Reference</label>
+                  <input
+                    className="input-field w-full"
+                    type="text"
+                    placeholder="e.g. WHATSAPP"
+                    value={form.reference}
+                    onChange={e => setForm(f => ({ ...f, reference: e.target.value }))}
+                  />
                 </div>
               </div>
 

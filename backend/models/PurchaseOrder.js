@@ -13,7 +13,8 @@ const purchaseOrderSchema = new mongoose.Schema({
   deliveryTerms: { type: String },
   paymentTerms: { type: String },
   dispatchTo: { type: String },
-  remarks: { type: String }
+  remarks: { type: String },
+  reference: { type: String }
 }, { timestamps: true });
 
 export default mongoose.model('PurchaseOrder', purchaseOrderSchema);
