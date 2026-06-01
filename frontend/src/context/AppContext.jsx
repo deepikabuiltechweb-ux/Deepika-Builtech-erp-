@@ -70,6 +70,19 @@ export const AppProvider = ({ children }) => {
     toast.success("Logged out successfully");
   };
 
+  const updateProfile = async (profileData) => {
+    try {
+      const { data } = await axios.put(`${API_BASE_URL}/auth/profile`, profileData);
+      setUser(data);
+      localStorage.setItem('erp_user', JSON.stringify(data));
+      toast.success("Profile updated successfully!");
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Error updating profile");
+      return false;
+    }
+  };
+
   // Fetch all data from Backend
   const fetchData = async () => {
     const storedUser = localStorage.getItem('erp_user');
@@ -700,7 +713,7 @@ export const AppProvider = ({ children }) => {
 
   return (
     <AppContext.Provider value={{
-      user, login, logout,
+      user, login, logout, updateProfile,
       materials, setMaterials, addMaterial, updateMaterial, deleteMaterial,
       projects, setProjects, addProject, updateProject, deleteProject,
       vendors, setVendors, addVendor, updateVendor, deleteVendor,

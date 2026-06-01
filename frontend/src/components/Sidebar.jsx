@@ -70,12 +70,13 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'staff', 'viewer', 'store_team', 'purchase_team'] },
     { 
       path: '/enquiry', 
-      label: user?.role === 'purchase_team' ? 'Pending Enquiries' : 'Enquiry', 
+      label: 'Enquiry', 
       icon: Search, 
-      roles: ['admin', 'staff', 'store_team', 'purchase_team'] 
+      roles: ['admin', 'staff', 'purchase_team', 'store_team'] 
     },
     { path: '/quotations', label: 'Quotations', icon: FileText, roles: ['admin', 'staff', 'purchase_team'] },
     { path: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, roles: ['admin', 'staff', 'purchase_team'] },
+    { path: '/emergency-dc', label: 'Emergency DC', icon: AlertTriangle, roles: ['admin', 'purchase_team'] },
     { path: '/store', label: 'Store / GRN', icon: Warehouse, roles: ['admin', 'staff', 'store_team'] },
     { path: '/issue', label: 'Issue Material', icon: ArrowUpRight, roles: ['admin', 'staff', 'store_team'] },
     { path: '/inventory', label: 'Inventory', icon: Package, roles: ['admin', 'staff', 'viewer', 'store_team', 'purchase_team'] },
@@ -84,7 +85,6 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     { path: '/vendors', label: 'Vendors', icon: Users, roles: ['admin', 'staff', 'purchase_team'] },
     { path: '/material-master', label: 'Material Master', icon: Database, roles: ['admin', 'staff', 'purchase_team'] },
     { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'staff', 'viewer', 'store_team', 'purchase_team'] },
-    { path: '/emergency-dc', label: 'Emergency DC', icon: AlertTriangle, roles: ['admin', 'purchase_team'] },
   ];
 
   const navItems = allNavItems.filter(item => item.roles.includes(user?.role));
@@ -118,7 +118,10 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
           </div>
 
           <div className="px-6 mb-4">
-             <div className="p-3 bg-white/10 rounded-xl flex items-center gap-3">
+             <NavLink 
+                to="/profile" 
+                className="p-3 bg-white/10 rounded-xl flex items-center gap-3 hover:bg-white/20 transition-all cursor-pointer select-none block"
+             >
                 <div className={cn(
                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                    user?.role === 'admin' ? "bg-success" : user?.role === 'viewer' ? "bg-sky-500" : "bg-warning"
@@ -131,7 +134,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
                      <Store className="w-5 h-5 text-white" />
                    )}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                    <p className="text-xs font-bold uppercase tracking-widest opacity-50 truncate">
                      {user?.role === 'store_team' 
                        ? 'Store' 
@@ -145,7 +148,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
                    </p>
                    <p className="text-sm font-semibold truncate">{user?.name}</p>
                 </div>
-             </div>
+             </NavLink>
           </div>
 
           {/* Navigation */}

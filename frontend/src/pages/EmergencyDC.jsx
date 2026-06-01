@@ -3,10 +3,12 @@ import { useApp } from '../context/AppContext';
 import {
   AlertTriangle, Plus, Trash2, CheckCircle, XCircle, Clock,
   ShoppingBag, User, Phone, MapPin, FileText, IndianRupee,
-  CreditCard, Receipt, Building2, ClipboardList, Eye
+  CreditCard, Receipt, Building2, ClipboardList, Eye, Download
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { twMerge } from 'tailwind-merge';
 import { clsx } from 'clsx';
 
@@ -48,6 +50,137 @@ export default function EmergencyDC() {
   const [showForm, setShowForm] = useState(false);
   const [viewDC, setViewDC] = useState(null);
   const [filterStatus, setFilterStatus] = useState('All');
+
+  // ─── PDF Generator ────────────────────────────────────────────────────────
+  const generatePDF = (dc) => {
+    const doc = new jsPDF();
+
+    // Header banner
+    doc.setFillColor(239, 68, 68); // Red-Orange theme for site emergency
+    doc.rect(0, 0, 210, 42, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DEEPIKA BUILTECH PRIVATE LIMITED', 105, 18, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('No. 12, Main Road, Industrial Suburb, Bangalore - 560010', 105, 27, { align: 'center' });
+    doc.text('GSTIN: 29ABCDE1234F1Z5  |  Tel: +91 80 1234 5678', 105, 34, { align: 'center' });
+
+    // Title strip
+    doc.setFillColor(254, 242, 242);
+    doc.rect(0, 42, 210, 12, 'F');
+    doc.setTextColor(185, 28, 28);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EMERGENCY LOCAL PURCHASE CHALLAN', 14, 51);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    doc.text(`DC No: ${dc.id}`, 140, 48);
+    doc.text(`Date: ${format(new Date(dc.dcDate), 'dd-MM-yyyy')}`, 140, 54);
+
+    // Vendor & Shipment Boxes
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(14, 60, 85, 38);
+    doc.rect(111, 60, 85, 38);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(185, 28, 28);
+    doc.text('LOCAL VENDOR / SHOP', 17, 67);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 30, 30);
+    doc.text(dc.localVendorName || '—', 17, 74);
+    doc.text(`Phone: ${dc.localVendorPhone || '—'}`, 17, 80);
+    doc.text(`Address: ${dc.localVendorAddress || '—'}`, 17, 86);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(185, 28, 28);
+    doc.text('PURCHASE / PROJECT INFO', 114, 67);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 30, 30);
+    doc.text(`Project: ${dc.projectName || dc.projectId || '—'}`, 114, 74);
+    doc.text(`Purchased By: ${dc.purchasedBy || '—'}`, 114, 80);
+    doc.text(`Payment: ${dc.paymentMode || '—'} (Bill attached: ${dc.billAttached ? 'YES' : 'NO'})`, 114, 86);
+
+    // Emergency Reason Section
+    doc.setFillColor(255, 247, 237);
+    doc.rect(14, 104, 182, 10, 'F');
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(234, 88, 12);
+    doc.text(`JUSTIFICATION: ${dc.emergencyReason || '—'}`, 18, 110);
+
+    // Items Table
+    const tableData = dc.items.map((item, idx) => [
+      idx + 1,
+      item.description,
+      item.qty,
+      item.unit || 'Nos',
+      `₹${Number(item.unitPrice).toLocaleString()}`,
+      `₹${Number(item.totalPrice).toLocaleString()}`
+    ]);
+
+    const tableConfig = {
+      startY: 118,
+      head: [['#', 'Material / Item Description', 'Quantity', 'Unit', 'Unit Price', 'Total Price']],
+      body: tableData,
+      headStyles: { fillColor: [185, 28, 28], textColor: 255, fontSize: 9 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 8 },
+        2: { halign: 'right', cellWidth: 24 },
+        4: { halign: 'right', cellWidth: 32 },
+        5: { halign: 'right', cellWidth: 32 }
+      },
+      alternateRowStyles: { fillColor: [255, 242, 242] },
+    };
+
+    if (typeof doc.autoTable === 'function') {
+      doc.autoTable(tableConfig);
+    } else {
+      const autoTableFunc = typeof autoTable === 'function' ? autoTable : autoTable?.default;
+      if (typeof autoTableFunc === 'function') {
+        autoTableFunc(doc, tableConfig);
+      } else {
+        throw new Error("autoTable plugin is not loaded correctly.");
+      }
+    }
+
+    const finalY = (doc.lastAutoTable?.finalY || doc.previousAutoTable?.finalY || 150) + 5;
+
+    // Grand Total Box
+    doc.setFillColor(254, 242, 242);
+    doc.rect(120, finalY, 76, 12, 'F');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(185, 28, 28);
+    doc.text('Grand Total:', 125, finalY + 8);
+    doc.text(`₹${Number(dc.totalAmount).toLocaleString()}`, 193, finalY + 8, { align: 'right' });
+
+    // Remarks
+    if (dc.remarks) {
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Remarks: ${dc.remarks}`, 14, finalY + 20);
+    }
+
+    // Signature lines
+    const sigY = finalY + (dc.remarks ? 38 : 30);
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.line(14, sigY, 70, sigY);
+    doc.line(140, sigY, 196, sigY);
+    doc.text('Purchased By Signature', 14, sigY + 5);
+    doc.text('Approved / Authorized By', 140, sigY + 5);
+
+    doc.save(`${dc.id}.pdf`);
+    toast.success('Emergency DC PDF downloaded!');
+  };
 
   const [form, setForm] = useState({
     dcDate: format(new Date(), 'yyyy-MM-dd'),
@@ -574,6 +707,13 @@ export default function EmergencyDC() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+                          <button
+                            onClick={() => generatePDF(dc)}
+                            className="p-1.5 text-success hover:bg-success/10 rounded transition-colors"
+                            title="Download PDF"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
                           {isAdmin && dc.status === 'Pending Approval' && (
                             <>
                               <button
@@ -630,7 +770,15 @@ export default function EmergencyDC() {
                   <AlertTriangle className="w-6 h-6 text-orange-600" />
                 </div>
                 <div>
-                  <p className="font-bold text-lg text-text-dark">{viewDC.id}</p>
+                  <div className="flex items-center gap-3">
+                    <p className="font-bold text-lg text-text-dark">{viewDC.id}</p>
+                    <button
+                      onClick={() => generatePDF(viewDC)}
+                      className="btn-primary flex items-center gap-1.5 bg-white text-primary border border-primary hover:bg-primary-bg py-1 px-2.5 rounded-lg text-xs"
+                    >
+                      <Download className="w-3.5 h-3.5" /> PDF
+                    </button>
+                  </div>
                   <p className="text-sm text-text-gray">
                     {viewDC.dcDate ? format(new Date(viewDC.dcDate), 'dd MMM yyyy') : '-'}
                   </p>

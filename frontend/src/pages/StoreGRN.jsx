@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import Autocomplete from '../components/ui/Autocomplete';
-import { Warehouse, Plus, Eye, CheckCircle, Package, Truck, UserCheck, Trash2 } from 'lucide-react';
+import { Warehouse, Plus, Eye, CheckCircle, Package, Truck, UserCheck, Trash2, X, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { twMerge } from 'tailwind-merge';
 import { clsx } from 'clsx';
 
@@ -12,9 +14,152 @@ function cn(...inputs) {
 }
 
 export default function StoreGRN() {
-  const { grns, purchaseOrders, addGRN, deleteGRN, updateStockOnGRN, vendors, updatePurchaseOrder, isAdmin } = useApp();
+  const { grns, purchaseOrders, addGRN, deleteGRN, updateStockOnGRN, vendors, updatePurchaseOrder, isAdmin, projects } = useApp();
   const [showEntry, setShowEntry] = useState(false);
+  const [selectedGRN, setSelectedGRN] = useState(null);
+  const [selectedPO, setSelectedPO] = useState(null);
   const [selectedPOId, setSelectedPOId] = useState('');
+
+  // ─── PDF Generator ────────────────────────────────────────────────────────
+  const generatePDF = (grn) => {
+    try {
+      if (!grn) {
+        toast.error("GRN record is missing or invalid.");
+        return;
+      }
+
+      const doc = new jsPDF();
+
+      // Header banner
+      doc.setFillColor(30, 64, 175);
+      doc.rect(0, 0, 210, 42, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DEEPIKA BUILTECH PRIVATE LIMITED', 105, 18, { align: 'center' });
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text('No. 12, Main Road, Industrial Suburb, Bangalore - 560010', 105, 27, { align: 'center' });
+      doc.text('GSTIN: 29ABCDE1234F1Z5  |  Tel: +91 80 1234 5678', 105, 34, { align: 'center' });
+
+      // GRN Title strip
+      doc.setFillColor(239, 246, 255);
+      doc.rect(0, 42, 210, 12, 'F');
+      doc.setTextColor(30, 64, 175);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('GOODS RECEIPT NOTE (GRN)', 14, 51);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      doc.text(`GRN No: ${grn.id || '—'}`, 140, 48);
+
+      let grnDateFormatted = '—';
+      if (grn.grnDate) {
+        try {
+          grnDateFormatted = format(new Date(grn.grnDate), 'dd-MM-yyyy');
+        } catch (e) {
+          grnDateFormatted = grn.grnDate;
+        }
+      }
+      doc.text(`Date: ${grnDateFormatted}`, 140, 54);
+
+      // Vendor & Shipment Boxes
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.rect(14, 60, 85, 38);
+      doc.rect(111, 60, 85, 38);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 64, 175);
+      doc.text('VENDOR', 17, 67);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      
+      const vName = grn.vendorName || (vendors && vendors.find(v => v.id === grn.vendorId)?.name) || 'N/A';
+      doc.text(vName, 17, 74);
+      doc.text(`PO Reference: ${grn.poRef || grn.poId || '—'}`, 17, 80);
+      doc.text(`DC / Invoice No: ${grn.dcNo || grn.invoiceNo || '—'}`, 17, 86);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 64, 175);
+      doc.text('RECEIVING DETAILS', 114, 67);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      doc.text(`Vehicle No: ${grn.vehicleNo || '—'}`, 114, 74);
+      doc.text(`Driver Name: ${grn.driverName || '—'}`, 114, 80);
+      doc.text(`Received By: ${grn.receivedBy || '—'}`, 114, 86);
+
+      // Items Table
+      const tableData = (grn.items || []).map((item, idx) => [
+        idx + 1,
+        item.name || '—',
+        item.poQty || 0,
+        item.receivedQty || 0,
+        item.rejectedQty || 0,
+        item.qualityOk ? 'PASSED' : 'FAILED',
+        item.damageRemarks || '—'
+      ]);
+
+      const tableConfig = {
+        startY: 104,
+        head: [['#', 'Material Description', 'PO Qty', 'Received Qty', 'Rejected Qty', 'Quality Status', 'Remarks / Damages']],
+        body: tableData,
+        headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9 },
+        bodyStyles: { fontSize: 9 },
+        columnStyles: {
+          0: { cellWidth: 8 },
+          2: { halign: 'right', cellWidth: 18 },
+          3: { halign: 'right', cellWidth: 24 },
+          4: { halign: 'right', cellWidth: 24 },
+          5: { halign: 'center', cellWidth: 24 }
+        },
+        alternateRowStyles: { fillColor: [245, 247, 255] },
+      };
+
+      if (typeof doc.autoTable === 'function') {
+        doc.autoTable(tableConfig);
+      } else {
+        const autoTableFunc = typeof autoTable === 'function' ? autoTable : autoTable?.default;
+        if (typeof autoTableFunc === 'function') {
+          autoTableFunc(doc, tableConfig);
+        } else {
+          throw new Error("autoTable plugin is not loaded correctly.");
+        }
+      }
+
+      const finalY = (doc.lastAutoTable?.finalY || doc.previousAutoTable?.finalY || 150) + 10;
+
+      // Remarks
+      if (grn.remarks) {
+        doc.setFillColor(254, 243, 199);
+        doc.rect(14, finalY, 182, 14, 'F');
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(180, 83, 9);
+        doc.text('REMARKS:', 18, finalY + 5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(120, 53, 4);
+        doc.text(grn.remarks, 18, finalY + 10);
+      }
+
+      // Signature lines
+      const sigY = finalY + (grn.remarks ? 35 : 25);
+      doc.setTextColor(30, 30, 30);
+      doc.setFontSize(9);
+      doc.line(14, sigY, 70, sigY);
+      doc.line(140, sigY, 196, sigY);
+      doc.text('Received / Checked By', 14, sigY + 5);
+      doc.text('Authorized Store Manager', 140, sigY + 5);
+
+      doc.save(`${grn.id || 'GRN'}.pdf`);
+      toast.success('GRN PDF downloaded!');
+    } catch (err) {
+      console.error("PDF Generation Error:", err);
+      toast.error(`Failed to generate PDF: ${err.message}`);
+    }
+  };
   
   const [formData, setFormData] = useState({
     grnDate: format(new Date(), 'yyyy-MM-dd'),
@@ -109,6 +254,18 @@ export default function StoreGRN() {
                   placeholder="Search Pending PO..."
                   value={formData.poRef}
                 />
+                {formData.poRef && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const po = purchaseOrders.find(p => p.id === formData.poRef);
+                      if (po) setSelectedPO(po);
+                    }}
+                    className="mt-1.5 text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> View PO details
+                  </button>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-text-gray mb-1">GRN Date</label>
@@ -249,7 +406,8 @@ export default function StoreGRN() {
                            <td>{grn.items.length} Items</td>
                            <td>
                               <div className="flex gap-2">
-                                 <button onClick={() => toast("View feature coming soon", { icon: '👁️' })} className="p-1 text-primary hover:bg-primary-bg rounded"><Eye className="w-4 h-4" /></button>
+                                 <button onClick={() => setSelectedGRN(grn)} className="p-1 text-primary hover:bg-primary-bg rounded" title="View GRN Details"><Eye className="w-4 h-4" /></button>
+                                 <button onClick={() => generatePDF(grn)} className="p-1 text-success hover:bg-success/10 rounded" title="Download GRN PDF"><Download className="w-4 h-4" /></button>
                                  {isAdmin && (
                                     <button 
                                        onClick={() => {
@@ -284,7 +442,17 @@ export default function StoreGRN() {
                              <p className="text-xs text-white/70">{vendors.find(v => v.id === p.vendorId)?.name}</p>
                              <div className="mt-2 flex justify-between items-center">
                                 <span className="text-[10px] uppercase tracking-wider font-bold text-warning">{p.status}</span>
-                                <button onClick={() => { setShowEntry(true); handlePOSelect(p.id); }} className="text-[10px] bg-white text-primary px-2 py-1 rounded font-bold hover:bg-primary-bg">RECEIVE</button>
+                                <div className="flex gap-2">
+                                  <button 
+                                     type="button"
+                                     onClick={() => setSelectedPO(p)} 
+                                     className="text-[10px] bg-white/10 text-white border border-white/20 px-2 py-1 rounded font-bold hover:bg-white/20 flex items-center gap-0.5 transition-colors"
+                                     title="View Purchase Order Details"
+                                  >
+                                     <Eye className="w-3 h-3" /> VIEW
+                                  </button>
+                                  <button onClick={() => { setShowEntry(true); handlePOSelect(p.id); }} className="text-[10px] bg-white text-primary px-2 py-1 rounded font-bold hover:bg-primary-bg transition-colors">RECEIVE</button>
+                                </div>
                              </div>
                           </div>
                        ))
@@ -305,6 +473,191 @@ export default function StoreGRN() {
                  </div>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* ─── GRN Detail Modal ──────────────────────────────────────────── */}
+      {selectedGRN && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="text-xl font-bold text-text-dark">GRN Details — {selectedGRN.id}</h2>
+                <p className="text-sm text-text-gray">{format(new Date(selectedGRN.grnDate), 'dd-MM-yyyy')}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => generatePDF(selectedGRN)}
+                  className="btn-primary flex items-center gap-2 bg-white text-primary border border-primary hover:bg-primary-bg py-1.5 px-3 rounded-lg text-xs"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download PDF
+                </button>
+                <button onClick={() => setSelectedGRN(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X className="w-5 h-5 text-text-gray" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-5">
+              {/* Meta Info */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'PO Reference', value: selectedGRN.poRef || selectedGRN.poId || '—' },
+                  { label: 'Vendor', value: selectedGRN.vendorName || vendors.find(v => v.id === selectedGRN.vendorId)?.name || '—' },
+                  { label: 'Vehicle No', value: selectedGRN.vehicleNo || '—' },
+                  { label: 'DC / Invoice No', value: selectedGRN.dcNo || selectedGRN.invoiceNo || '—' },
+                  { label: 'Driver Name', value: selectedGRN.driverName || '—' },
+                  { label: 'Received By', value: selectedGRN.receivedBy || '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-primary-bg p-3 rounded-lg">
+                    <p className="text-xs text-text-gray uppercase tracking-wide">{label}</p>
+                    <p className="font-semibold text-text-dark mt-0.5">{value}</p>
+                  </div>
+                ))}
+              </div>
+              {/* Items Table */}
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-sm">
+                  <thead className="bg-primary/10 text-primary">
+                    <tr>
+                      <th className="px-4 py-2 text-left">#</th>
+                      <th className="px-4 py-2 text-left">Item</th>
+                      <th className="px-4 py-2 text-right">PO Qty</th>
+                      <th className="px-4 py-2 text-right">Received</th>
+                      <th className="px-4 py-2 text-right">Rejected</th>
+                      <th className="px-4 py-2 text-center">Quality OK</th>
+                      <th className="px-4 py-2 text-left">Damage Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedGRN.items.map((item, idx) => (
+                      <tr key={idx} className="border-t border-border hover:bg-gray-50">
+                        <td className="px-4 py-2 text-text-gray">{idx + 1}</td>
+                        <td className="px-4 py-2 font-medium">{item.name}</td>
+                        <td className="px-4 py-2 text-right">{item.poQty}</td>
+                        <td className="px-4 py-2 text-right font-bold text-primary">{item.receivedQty}</td>
+                        <td className="px-4 py-2 text-right text-error">{item.rejectedQty || 0}</td>
+                        <td className="px-4 py-2 text-center">
+                          {item.qualityOk
+                            ? <CheckCircle className="w-4 h-4 text-success mx-auto" />
+                            : <span className="text-error font-bold">✗</span>}
+                        </td>
+                        <td className="px-4 py-2 text-text-gray text-xs">{item.damageRemarks || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {selectedGRN.remarks && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1">Remarks</p>
+                  <p className="text-sm text-amber-900">{selectedGRN.remarks}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ─── PO Detail Modal (Before GRN Receipt) ────────────────────────── */}
+      {selectedPO && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <span className="bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">Purchase Order Preview</span>
+                <h2 className="text-xl font-bold text-text-dark mt-1">Order Ref: {selectedPO.id}</h2>
+                <p className="text-xs text-text-gray">PO Date: {format(new Date(selectedPO.date), 'dd-MM-yyyy')}</p>
+              </div>
+              <button onClick={() => setSelectedPO(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-text-gray" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto text-left">
+              {/* Vendor & Project Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-primary-bg p-4 rounded-xl border border-border space-y-2">
+                  <h3 className="font-bold text-primary text-xs uppercase tracking-wider">Vendor Details</h3>
+                  <p className="font-bold text-text-dark text-base">{vendors.find(v => v.id === selectedPO.vendorId)?.name || 'Unknown Vendor'}</p>
+                  <p className="text-sm text-text-gray">Contact: {vendors.find(v => v.id === selectedPO.vendorId)?.contact || '—'}</p>
+                  <p className="text-sm text-text-gray">Email: {vendors.find(v => v.id === selectedPO.vendorId)?.email || '—'}</p>
+                </div>
+                
+                <div className="bg-primary-bg p-4 rounded-xl border border-border space-y-2">
+                  <h3 className="font-bold text-primary text-xs uppercase tracking-wider">Project & Shipping</h3>
+                  <p className="font-bold text-text-dark text-base">{projects?.find(p => p.id === selectedPO.projectId)?.name || 'Unknown Project'}</p>
+                  <p className="text-sm text-text-gray">Work Order No: {selectedPO.workOrderNo || '—'}</p>
+                  {selectedPO.deliveryDate && (
+                    <p className="text-sm text-text-gray">
+                      Expected Delivery: {format(new Date(selectedPO.deliveryDate), 'dd-MM-yyyy')}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-sm">
+                  <thead className="bg-primary/10 text-primary">
+                    <tr>
+                      <th className="px-4 py-2 text-left w-8">#</th>
+                      <th className="px-4 py-2 text-left">Code</th>
+                      <th className="px-4 py-2 text-left">Item Description</th>
+                      <th className="px-4 py-2 text-right">Qty</th>
+                      <th className="px-4 py-2 text-left">Unit</th>
+                      <th className="px-4 py-2 text-right">Rate</th>
+                      <th className="px-4 py-2 text-right">GST%</th>
+                      <th className="px-4 py-2 text-right font-semibold">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedPO.items.map((item, idx) => (
+                      <tr key={idx} className="border-t border-border hover:bg-gray-50">
+                        <td className="px-4 py-2 text-text-gray">{idx + 1}</td>
+                        <td className="px-4 py-2 font-mono text-xs">{item.itemCode || '—'}</td>
+                        <td className="px-4 py-2 font-medium">{item.itemName}</td>
+                        <td className="px-4 py-2 text-right font-bold text-text-dark">{item.qty}</td>
+                        <td className="px-4 py-2 text-text-gray">{item.unit}</td>
+                        <td className="px-4 py-2 text-right">₹{Number(item.rate).toLocaleString()}</td>
+                        <td className="px-4 py-2 text-right text-text-gray">{item.gst}%</td>
+                        <td className="px-4 py-2 text-right font-semibold text-primary">₹{Number(item.total).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary and Proceed Button */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pt-4 border-t border-border">
+                <div className="text-sm">
+                  <span className="text-text-gray">Total Order Value: </span>
+                  <span className="font-bold text-lg text-primary">
+                    ₹{selectedPO.items.reduce((acc, i) => acc + Number(i.total), 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex gap-3 w-full md:w-auto">
+                  <button 
+                    type="button"
+                    onClick={() => setSelectedPO(null)} 
+                    className="flex-1 md:flex-initial px-5 py-2.5 border border-border rounded-xl text-text-gray hover:bg-gray-50 font-semibold text-sm transition-all"
+                  >
+                    Close
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setShowEntry(true);
+                      handlePOSelect(selectedPO.id);
+                      setSelectedPO(null);
+                      toast.success(`Generated GRN Form for ${selectedPO.id}!`);
+                    }}
+                    className="flex-1 md:flex-initial btn-primary px-6 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-xl transition-all"
+                  >
+                    <Plus className="w-4 h-4" /> Generate GRN Receipt
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

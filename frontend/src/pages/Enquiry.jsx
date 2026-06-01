@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import Autocomplete from '../components/ui/Autocomplete';
-import { Plus, Trash2, Send, Eye, FileEdit, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Send, Eye, FileEdit, CheckCircle, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { twMerge } from 'tailwind-merge';
@@ -14,6 +14,7 @@ function cn(...inputs) {
 export default function Enquiry() {
   const { materials, projects, vendors, enquiries, addEnquiry, deleteEnquiry, addMaterial, isAdmin, isPurchaseTeam, isStoreTeam, addProject } = useApp();
   const [showForm, setShowForm] = useState(false);
+  const [selectedEnq, setSelectedEnq] = useState(null);
   
   const [formData, setFormData] = useState({
     projectId: '',
@@ -132,6 +133,7 @@ export default function Enquiry() {
     const success = await addEnquiry(formData);
     if (success) {
       setShowForm(false);
+      setSelectedEnq(null);
       setFormData({
         projectId: '',
         workOrderNo: '',
@@ -146,10 +148,10 @@ export default function Enquiry() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-text-dark">{isPurchaseTeam && !isAdmin ? "Pending Enquiries" : "Purchase Enquiry"}</h1>
+          <h1 className="text-2xl font-bold text-text-dark">Purchase Enquiry</h1>
           <p className="text-text-gray">Request quotations from vendors for project materials.</p>
         </div>
-        {!showForm && (isStoreTeam || isAdmin) && (
+        {!showForm && (isStoreTeam || isPurchaseTeam || isAdmin) && (
           <button onClick={() => setShowForm(true)} className="btn-primary">
             <Plus className="w-4 h-4" /> Create Enquiry
           </button>
@@ -407,11 +409,28 @@ export default function Enquiry() {
                     </td>
                     <td>
                       <div className="flex gap-2">
-                        <button onClick={() => toast("View feature coming soon", { icon: '👁️' })} className="p-1 text-primary hover:bg-primary-bg rounded"><Eye className="w-4 h-4" /></button>
-                        {(isStoreTeam || isAdmin) && (
-                          <button onClick={() => toast("Edit feature coming soon", { icon: '✏️' })} className="p-1 text-text-gray hover:bg-primary-bg rounded"><FileEdit className="w-4 h-4" /></button>
+                        <button onClick={() => setSelectedEnq(enq)} className="p-1 text-primary hover:bg-primary-bg rounded" title="View Enquiry Details"><Eye className="w-4 h-4" /></button>
+                        {(isStoreTeam || isPurchaseTeam || isAdmin) && (
+                          <button
+                            onClick={() => {
+                              setFormData({
+                                projectId: enq.projectId || '',
+                                workOrderNo: enq.workOrderNo || '',
+                                requiredDate: enq.requiredDate || '',
+                                items: enq.items && enq.items.length > 0
+                                  ? enq.items.map(i => ({ ...i, id: i.id || Date.now() + Math.random() }))
+                                  : [{ id: Date.now(), materialId: '', name: '', qty: 0, unit: '', requiredDate: '', isSubItem: false, mainNum: 1, displayNum: '1' }],
+                                selectedVendors: enq.selectedVendors || []
+                              });
+                              setShowForm(true);
+                            }}
+                            className="p-1 text-text-gray hover:bg-primary-bg rounded"
+                            title="Edit Enquiry"
+                          >
+                            <FileEdit className="w-4 h-4" />
+                          </button>
                         )}
-                        {(isStoreTeam || isAdmin) && (
+                        {(isStoreTeam || isPurchaseTeam || isAdmin) && (
                           <button onClick={() => toast.success("Enquiry Sent to Vendors!")} className="p-1 text-success hover:bg-success/10 rounded"><Send className="w-4 h-4" /></button>
                         )}
                         {enq.status === 'Open' && (isPurchaseTeam || isAdmin) && (
@@ -444,6 +463,77 @@ export default function Enquiry() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ─── Enquiry Detail Modal ───────────────────────────────────── */}
+      {selectedEnq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="text-xl font-bold text-text-dark">Enquiry — {selectedEnq.id}</h2>
+                <p className="text-sm text-text-gray">{format(new Date(selectedEnq.date), 'dd-MM-yyyy')} &bull; Work Order: {selectedEnq.workOrderNo || '—'}</p>
+              </div>
+              <button onClick={() => setSelectedEnq(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-text-gray" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              {/* Meta */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { label: 'Project', value: projects.find(p => p.id === selectedEnq.projectId)?.name || '—' },
+                  { label: 'Required Date', value: selectedEnq.requiredDate ? format(new Date(selectedEnq.requiredDate), 'dd-MM-yyyy') : '—' },
+                  { label: 'Status', value: selectedEnq.status },
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-primary-bg p-3 rounded-lg">
+                    <p className="text-xs text-text-gray uppercase tracking-wide">{label}</p>
+                    <p className="font-semibold text-text-dark mt-0.5">{value}</p>
+                  </div>
+                ))}
+              </div>
+              {/* Items */}
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-sm">
+                  <thead className="bg-primary/10 text-primary">
+                    <tr>
+                      <th className="px-4 py-2 text-left">#</th>
+                      <th className="px-4 py-2 text-left">Material</th>
+                      <th className="px-4 py-2 text-right">Qty</th>
+                      <th className="px-4 py-2 text-left">Unit</th>
+                      <th className="px-4 py-2 text-left">Required By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedEnq.items.map((item, idx) => (
+                      <tr key={idx} className={cn('border-t border-border', item.isSubItem ? 'bg-slate-50' : '')}>
+                        <td className="px-4 py-2 text-text-gray font-mono text-xs">{item.displayNum || idx + 1}</td>
+                        <td className="px-4 py-2 font-medium">{item.isSubItem && <span className="text-primary mr-1">↳</span>}{item.name || '—'}</td>
+                        <td className="px-4 py-2 text-right font-bold text-primary">{item.qty}</td>
+                        <td className="px-4 py-2 text-text-gray">{item.unit}</td>
+                        <td className="px-4 py-2 text-text-gray text-xs">{item.requiredDate ? format(new Date(item.requiredDate), 'dd-MM-yyyy') : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Vendors */}
+              {selectedEnq.selectedVendors && selectedEnq.selectedVendors.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-text-gray mb-2">Vendors Notified</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedEnq.selectedVendors.map(vId => {
+                      const vendor = vendors.find(v => v.id === vId);
+                      return vendor ? (
+                        <span key={vId} className="px-3 py-1 bg-primary-bg text-primary text-sm font-medium rounded-full">{vendor.name}</span>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

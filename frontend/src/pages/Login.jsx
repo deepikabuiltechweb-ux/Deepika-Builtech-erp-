@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Warehouse, LogIn, Mail, Lock, Shield, Package, ShoppingBag, ClipboardList, CheckCircle, Eye } from 'lucide-react';
+import { Warehouse, LogIn, Mail, Lock, Shield, Package, ShoppingBag, ClipboardList, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -15,6 +15,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -178,13 +179,22 @@ export default function Login() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
-                  type="password" 
+                  type={showPassword ? 'text' : 'password'}
                   required
-                  className="input-field pl-10 py-3 text-sm focus:border-slate-400"
+                  className="input-field pl-10 pr-10 py-3 text-sm focus:border-slate-400"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 

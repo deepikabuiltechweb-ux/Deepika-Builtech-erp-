@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Bell, User, Menu, Search, LogOut } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -51,15 +52,15 @@ export default function Layout({ children }) {
             
             <div className="h-8 w-px bg-border mx-2"></div>
 
-            <div className="flex items-center gap-3 pl-2">
+            <Link to="/profile" className="flex items-center gap-3 pl-2 hover:opacity-80 transition-all cursor-pointer" title="View Profile Settings">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-text-dark">{user?.name || 'Guest User'}</p>
                 <p className="text-xs text-text-gray">{displayRole}</p>
               </div>
-              <button className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
                 <User className="w-6 h-6" />
-              </button>
-            </div>
+              </div>
+            </Link>
           </div>
         </header>
 

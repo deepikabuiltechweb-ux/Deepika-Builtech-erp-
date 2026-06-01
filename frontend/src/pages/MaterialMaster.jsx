@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Plus, Search, Filter, Edit2, Trash2, Download, Info } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 export default function MaterialMaster() {
   const { materials, addMaterial, updateMaterial, deleteMaterial, setMaterials, isAdmin, canEdit } = useApp();
@@ -74,6 +75,31 @@ export default function MaterialMaster() {
     m.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleExport = () => {
+    if (filteredMaterials.length === 0) {
+      toast.error("No materials to export.");
+      return;
+    }
+    const data = filteredMaterials.map(m => ({
+      'Material Code': m.id,
+      'Material Name': m.name,
+      'Category': m.category,
+      'Unit': m.unit,
+      'Brand': m.brand || '—',
+      'Last Price': m.lastPrice,
+      'Latest Price': m.latestPrice,
+      'Current Stock': m.currentStock,
+      'Min Stock Level': m.minLevel,
+      'Status': m.currentStock <= m.minLevel ? 'Low Stock' : 'In Stock'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Materials");
+    XLSX.writeFile(workbook, `Material_Master_Catalog.xlsx`);
+    toast.success("Excel exported successfully!");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -82,7 +108,7 @@ export default function MaterialMaster() {
           <p className="text-text-gray">Manage your inventory catalog and specifications.</p>
         </div>
         <div className="flex gap-3">
-          <button className="btn-primary bg-white text-primary border border-primary hover:bg-primary-bg">
+          <button onClick={handleExport} className="btn-primary bg-white text-primary border border-primary hover:bg-primary-bg cursor-pointer">
             <Download className="w-4 h-4" /> Export
           </button>
           {canEdit && (

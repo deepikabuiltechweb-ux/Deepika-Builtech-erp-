@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import Autocomplete from '../components/ui/Autocomplete';
-import { ArrowUpRight, Plus, Trash2, CheckCircle, Package, History, Eye } from 'lucide-react';
+import { ArrowUpRight, Plus, Trash2, CheckCircle, Package, History, Eye, X, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { twMerge } from 'tailwind-merge';
 import { clsx } from 'clsx';
 
@@ -14,6 +16,121 @@ function cn(...inputs) {
 export default function IssueMaterial() {
   const { materials, projects, issues, addIssue, deleteIssue, deductStockOnIssue, isAdmin, addProject, purchaseOrders } = useApp();
   const [showForm, setShowForm] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState(null);
+
+  // ─── PDF Generator ────────────────────────────────────────────────────────
+  const generatePDF = (issue) => {
+    const doc = new jsPDF();
+    const projName = projects.find(p => p.id === issue.projectId)?.name || 'Unknown Project';
+
+    // Header banner
+    doc.setFillColor(30, 64, 175);
+    doc.rect(0, 0, 210, 42, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DEEPIKA BUILTECH PRIVATE LIMITED', 105, 18, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('No. 12, Main Road, Industrial Suburb, Bangalore - 560010', 105, 27, { align: 'center' });
+    doc.text('GSTIN: 29ABCDE1234F1Z5  |  Tel: +91 80 1234 5678', 105, 34, { align: 'center' });
+
+    // Issue Slip Title strip
+    doc.setFillColor(239, 246, 255);
+    doc.rect(0, 42, 210, 12, 'F');
+    doc.setTextColor(30, 64, 175);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('MATERIAL ISSUE SLIP', 14, 51);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    doc.text(`Issue No: ${issue.id}`, 140, 48);
+    doc.text(`Date: ${format(new Date(issue.issueDate), 'dd-MM-yyyy')}`, 140, 54);
+
+    // Meta Boxes
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(14, 60, 85, 38);
+    doc.rect(111, 60, 85, 38);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175);
+    doc.text('PROJECT ALLOCATION', 17, 67);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 30, 30);
+    doc.text(projName, 17, 74);
+    doc.text(`Work Order / PO: ${issue.workOrderNo || '—'}`, 17, 80);
+    doc.text(`Remarks / Purpose: ${issue.purpose || '—'}`, 17, 86);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175);
+    doc.text('DISPATCH DETAILS', 114, 67);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 30, 30);
+    doc.text(`Issued To: ${issue.issuedTo || '—'}`, 114, 74);
+    doc.text(`Status: Dispatched`, 114, 80);
+
+    // Items Table
+    const tableData = issue.items.map((item, idx) => [
+      idx + 1,
+      item.name,
+      item.qty,
+      item.unit || 'Nos',
+      `₹${Number(item.rate).toLocaleString()}`,
+      `₹${Number(item.qty * item.rate).toLocaleString()}`
+    ]);
+
+    const tableConfig = {
+      startY: 104,
+      head: [['#', 'Material Description', 'Quantity', 'Unit', 'LPR Rate', 'Total Cost']],
+      body: tableData,
+      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 8 },
+        2: { halign: 'right', cellWidth: 24 },
+        4: { halign: 'right', cellWidth: 32 },
+        5: { halign: 'right', cellWidth: 32 }
+      },
+      alternateRowStyles: { fillColor: [245, 247, 255] },
+    };
+
+    if (typeof doc.autoTable === 'function') {
+      doc.autoTable(tableConfig);
+    } else {
+      const autoTableFunc = typeof autoTable === 'function' ? autoTable : autoTable?.default;
+      if (typeof autoTableFunc === 'function') {
+        autoTableFunc(doc, tableConfig);
+      } else {
+        throw new Error("autoTable plugin is not loaded correctly.");
+      }
+    }
+
+    const finalY = (doc.lastAutoTable?.finalY || doc.previousAutoTable?.finalY || 150) + 5;
+
+    // Grand Total Box
+    doc.setFillColor(245, 247, 255);
+    doc.rect(120, finalY, 76, 12, 'F');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175);
+    doc.text('Grand Total:', 125, finalY + 8);
+    doc.text(`₹${Number(issue.totalCost).toLocaleString()}`, 193, finalY + 8, { align: 'right' });
+
+    // Signature lines
+    const sigY = finalY + 28;
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(9);
+    doc.line(14, sigY, 70, sigY);
+    doc.line(140, sigY, 196, sigY);
+    doc.text('Issued By (Store Keeper)', 14, sigY + 5);
+    doc.text('Received By (Site Rep)', 140, sigY + 5);
+
+    doc.save(`${issue.id}.pdf`);
+    toast.success('Material Issue PDF downloaded!');
+  };
   
   const [formData, setFormData] = useState({
     issueDate: format(new Date(), 'yyyy-MM-dd'),
@@ -252,7 +369,8 @@ export default function IssueMaterial() {
                         <td className="text-right font-bold">₹{issue.totalCost.toLocaleString()}</td>
                          <td>
                             <div className="flex gap-2">
-                               <button onClick={() => toast("View feature coming soon", { icon: '👁️' })} className="p-1 text-primary hover:bg-primary-bg rounded"><Eye className="w-4 h-4" /></button>
+                               <button onClick={() => setSelectedIssue(issue)} className="p-1 text-primary hover:bg-primary-bg rounded" title="View Issue Details"><Eye className="w-4 h-4" /></button>
+                               <button onClick={() => generatePDF(issue)} className="p-1 text-success hover:bg-success/10 rounded" title="Download Issue PDF"><Download className="w-4 h-4" /></button>
                                {isAdmin && (
                                  <button 
                                    onClick={() => {
@@ -272,6 +390,80 @@ export default function IssueMaterial() {
                  )}
               </tbody>
            </table>
+        </div>
+      )}
+
+      {/* ─── Issue Detail Modal ───────────────────────────────────────── */}
+      {selectedIssue && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="text-xl font-bold text-text-dark">Material Issue — {selectedIssue.id}</h2>
+                <p className="text-sm text-text-gray">{format(new Date(selectedIssue.issueDate), 'dd-MM-yyyy')}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => generatePDF(selectedIssue)}
+                  className="btn-primary flex items-center gap-2 bg-white text-primary border border-primary hover:bg-primary-bg py-1.5 px-3 rounded-lg text-xs font-semibold"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download PDF
+                </button>
+                <button onClick={() => setSelectedIssue(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X className="w-5 h-5 text-text-gray" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-5">
+              {/* Meta Info */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'Project', value: projects.find(p => p.id === selectedIssue.projectId)?.name || '—' },
+                  { label: 'Work Order / PO', value: selectedIssue.workOrderNo || '—' },
+                  { label: 'Issued To', value: selectedIssue.issuedTo || '—' },
+                  { label: 'Purpose / Remarks', value: selectedIssue.purpose || '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-primary-bg p-3 rounded-lg">
+                    <p className="text-xs text-text-gray uppercase tracking-wide">{label}</p>
+                    <p className="font-semibold text-text-dark mt-0.5">{value}</p>
+                  </div>
+                ))}
+              </div>
+              {/* Items Table */}
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-sm">
+                  <thead className="bg-primary/10 text-primary">
+                    <tr>
+                      <th className="px-4 py-2 text-left">#</th>
+                      <th className="px-4 py-2 text-left">Material</th>
+                      <th className="px-4 py-2 text-right">Qty</th>
+                      <th className="px-4 py-2 text-left">Unit</th>
+                      <th className="px-4 py-2 text-right">Rate (LPR)</th>
+                      <th className="px-4 py-2 text-right">Total Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedIssue.items.map((item, idx) => (
+                      <tr key={idx} className="border-t border-border hover:bg-gray-50">
+                        <td className="px-4 py-2 text-text-gray">{idx + 1}</td>
+                        <td className="px-4 py-2 font-medium">{item.name}</td>
+                        <td className="px-4 py-2 text-right font-bold text-primary">{item.qty}</td>
+                        <td className="px-4 py-2 text-text-gray">{item.unit}</td>
+                        <td className="px-4 py-2 text-right">₹{Number(item.rate).toLocaleString()}</td>
+                        <td className="px-4 py-2 text-right font-bold text-primary">₹{(item.qty * item.rate).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-primary-bg">
+                    <tr>
+                      <td colSpan="5" className="px-4 py-3 text-right font-bold text-text-dark">Grand Total:</td>
+                      <td className="px-4 py-3 text-right font-bold text-primary text-lg">₹{Number(selectedIssue.totalCost).toLocaleString()}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

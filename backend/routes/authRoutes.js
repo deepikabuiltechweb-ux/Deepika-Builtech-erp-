@@ -4,13 +4,15 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/apiResponse.js';
+import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 mins
-  max: 5,
-  message: 'Too many login attempts from this IP, please try again after 15 minutes'
+  max: process.env.NODE_ENV === 'production' ? 5 : 1000,
+  message: 'Too many login attempts from this IP, please try again after 15 minutes',
+  skip: (req) => process.env.NODE_ENV !== 'production'
 });
 
 const generateTokens = (id) => {
@@ -83,6 +85,33 @@ router.post('/logout', (req, res) => {
   res.clearCookie('refreshToken');
   res.status(200).json(new ApiResponse(200, null, 'Logged out successfully'));
 });
+
+// Update Profile route
+router.put('/profile', protect, asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  user.name = req.body.name || user.name;
+  user.email = req.body.email || user.email;
+
+  if (req.body.password) {
+    user.password = req.body.password;
+  }
+
+  const updatedUser = await user.save();
+
+  res.status(200).json({
+    _id: updatedUser._id,
+    name: updatedUser.name,
+    email: updatedUser.email,
+    role: updatedUser.role,
+    token: req.cookies?.accessToken || req.headers.authorization?.split(' ')[1]
+  });
+}));
 
 // Create setup route just in case
 router.post('/setup', async (req, res) => {
