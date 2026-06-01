@@ -77,8 +77,8 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // 5. Body Parsers & Sanitization
-app.use(express.json({ limit: '10kb' })); // Max payload size
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json({ limit: '10mb' })); // Increased for Base64 image uploads
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(hpp()); // Prevent HTTP Parameter Pollution
 
