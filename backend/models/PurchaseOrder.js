@@ -8,7 +8,12 @@ const purchaseOrderSchema = new mongoose.Schema({
   projectId: { type: String },
   workOrderNo: { type: String },
   items: { type: mongoose.Schema.Types.Mixed },
-  status: { type: String, default: 'Sent' }
+  status: { type: String, default: 'Sent' },
+  deliveryDate: { type: String },
+  deliveryTerms: { type: String },
+  paymentTerms: { type: String },
+  dispatchTo: { type: String },
+  remarks: { type: String }
 }, { timestamps: true });
 
 export default mongoose.model('PurchaseOrder', purchaseOrderSchema);

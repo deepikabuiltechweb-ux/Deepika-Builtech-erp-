@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import Autocomplete from '../components/ui/Autocomplete';
 import {
   ShoppingCart, Eye, Printer, Mail, CheckCircle, FileText,
-  Download, Trash2, Plus, X, PlusCircle, MinusCircle
+  Download, Trash2, Plus, X, PlusCircle, MinusCircle, FileEdit
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -31,12 +32,13 @@ const emptyItem = () => ({
 
 export default function PurchaseOrders() {
   const {
-    purchaseOrders, addPurchaseOrder, deletePurchaseOrder,
-    vendors, projects, isAdmin, isPurchaseTeam, updateVendor
+    purchaseOrders, addPurchaseOrder, deletePurchaseOrder, updatePurchaseOrder,
+    vendors, projects, isAdmin, isPurchaseTeam, updateVendor, addVendor, addProject
   } = useApp();
 
   const [selectedPO, setSelectedPO] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
   // --- Form State ---
   const [form, setForm] = useState({
@@ -47,155 +49,303 @@ export default function PurchaseOrders() {
     deliveryDate: '',
     status: 'Sent',
     items: [emptyItem()],
+    dispatchTo: 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC',
+    deliveryTerms: format(new Date(), 'yyyy-MM-dd'),
+    paymentTerms: '45 Days Credit',
+    remarks: '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
   });
   const [submitting, setSubmitting] = useState(false);
+  const [showDispatchSuggestions, setShowDispatchSuggestions] = useState(false);
+
+  const handleAddNewVendor = async (name) => {
+    const newVend = await addVendor({
+      name,
+      address: 'No. 15, Ponniamman Nagar Road, Chennai - 600095',
+      email: 'TBD',
+      contact: 'TBD',
+      gstin: '33AAGCB5988F1ZH'
+    });
+    if (newVend) {
+      setForm(f => ({ ...f, vendorId: newVend.id }));
+    }
+  };
+
+  const handleAddNewProject = async (name) => {
+    const newProj = await addProject({
+      name,
+      client: 'TBD',
+      location: 'TBD',
+      budget: 0,
+      status: 'Active'
+    });
+    if (newProj) {
+      setForm(f => ({ ...f, projectId: newProj.id }));
+    }
+  };
+
+  const uniqueDispatchAddresses = Array.from(new Set(
+    purchaseOrders
+      .map(po => po.dispatchTo)
+      .filter(addr => addr && addr.trim() !== '')
+  ));
+  
+  const defaultAddress = 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC';
+  
+  const dispatchSuggestions = uniqueDispatchAddresses.includes(defaultAddress)
+    ? uniqueDispatchAddresses
+    : [defaultAddress, ...uniqueDispatchAddresses];
+
+  const filteredDispatchSuggestions = dispatchSuggestions.filter(addr => 
+    addr.toLowerCase().includes((form.dispatchTo || '').toLowerCase())
+  );
 
   // ─── PDF Generator ────────────────────────────────────────────────────────
   const generatePDF = (po) => {
-    const vendor = vendors.find(v => v.id === po.vendorId);
-    const project = projects.find(p => p.id === po.projectId);
-    const doc = new jsPDF();
+    try {
+      const vendor = vendors.find(v => v.id === po.vendorId);
+      const project = projects.find(p => p.id === po.projectId);
+      const doc = new jsPDF();
 
-    // Header banner
-    doc.setFillColor(30, 64, 175);
-    doc.rect(0, 0, 210, 42, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('DEEPIKA BUILTECH PRIVATE LIMITED', 105, 18, { align: 'center' });
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text('No. 12, Main Road, Industrial Suburb, Bangalore - 560010', 105, 27, { align: 'center' });
-    doc.text('GSTIN: 29ABCDE1234F1Z5  |  Tel: +91 80 1234 5678', 105, 34, { align: 'center' });
+      // Number to Words converter (Indian System: Lakhs & Crores)
+      const numberToWords = (num) => {
+        const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+        const b = ['', '', 'Twenty ', 'Thirty ', 'Forty ', 'Fifty ', 'Sixty ', 'Seventy ', 'Eighty ', 'Ninety '];
+        
+        const numStr = Math.round(num).toString();
+        if (Math.round(num) === 0) return 'Zero Only';
+        if (numStr.length > 9) return 'Amount too large';
+        
+        const n = ('000000000' + numStr).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+        if (!n) return '';
+        
+        let str = '';
+        str += Number(n[1]) !== 0 ? (a[Number(n[1])] || b[n[1][0]] + a[n[1][1]]) + 'Crore ' : '';
+        str += Number(n[2]) !== 0 ? (a[Number(n[2])] || b[n[2][0]] + a[n[2][1]]) + 'Lakh ' : '';
+        str += Number(n[3]) !== 0 ? (a[Number(n[3])] || b[n[3][0]] + a[n[3][1]]) + 'Thousand ' : '';
+        str += Number(n[4]) !== 0 ? a[Number(n[4])] + 'Hundred ' : '';
+        str += Number(n[5]) !== 0 ? ((str !== '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + a[n[5][1]]) : '';
+        
+        return str.trim() + ' Only';
+      };
 
-    // PO Title strip
-    doc.setFillColor(239, 246, 255);
-    doc.rect(0, 42, 210, 12, 'F');
-    doc.setTextColor(30, 64, 175);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PURCHASE ORDER', 14, 51);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60, 60, 60);
-    doc.text(`PO No: ${po.id}`, 140, 48);
-    doc.text(`Date: ${format(new Date(po.date), 'dd-MM-yyyy')}`, 140, 54);
+      // Styles
+      doc.setFont('helvetica', 'normal');
+      doc.setDrawColor(0, 0, 0); // Black borders
+      doc.setLineWidth(0.4);
 
-    // Vendor & Project Boxes
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.3);
-    doc.rect(14, 60, 85, 38);
-    doc.rect(111, 60, 85, 38);
+      // 1. Purchase Order Title Strip
+      doc.setFillColor(219, 234, 254); // Light blue background
+      doc.rect(10, 10, 190, 10, 'FD');
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PURCHASE ORDER', 105, 17, { align: 'center' });
 
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 64, 175);
-    doc.text('VENDOR', 17, 67);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(30, 30, 30);
-    doc.text(vendor?.name || 'N/A', 17, 74);
-    doc.text(`Contact: ${vendor?.contact || ''}`, 17, 80);
-    doc.text(`Email: ${vendor?.email || ''}`, 17, 86);
+      // 2. Bounding Grid Box (Y=20 to Y=90)
+      doc.rect(10, 20, 190, 70, 'D');
 
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 64, 175);
-    doc.text('SHIP TO / PROJECT', 114, 67);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(30, 30, 30);
-    doc.text(project?.name || 'N/A', 114, 74);
-    doc.text(`Work Order: ${po.workOrderNo || ''}`, 114, 80);
-    if (po.deliveryDate) {
-      doc.text(`Delivery By: ${format(new Date(po.deliveryDate), 'dd-MM-yyyy')}`, 114, 86);
-    }
+      // Vertical Divider splits Left Panel (width 80) and Right Panel (width 110)
+      doc.line(90, 20, 90, 90);
 
-    // Items Table
-    const tableData = po.items.map((item, idx) => [
-      idx + 1,
-      item.itemCode,
-      item.itemName,
-      item.qty,
-      item.unit,
-      `₹${Number(item.rate).toLocaleString()}`,
-      `${item.gst}%`,
-      `₹${Number(item.gstAmt).toLocaleString()}`,
-      `₹${Number(item.total).toLocaleString()}`,
-    ]);
+      // --- LEFT PANEL (X: 10 to 90) ---
+      // Row 1: Deepika Address (spaced 3.5mm per line, fits Y=20 to Y=42)
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DEEPIKA BUILTECH ENGINEERING', 13, 23.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Survey No.44/5, Rajakulam Road,', 13, 27);
+      doc.text('Vaivayur Post, Karur Village, Kanchipuram - 631 561', 13, 30.5);
+      doc.text('Phone: 044-26256416, 29565416', 13, 34);
+      doc.text('mail: dbtechengg@gmail.com', 13, 37.5);
+      doc.text('GSTIN: 33AEGPL3660M1ZC', 13, 41);
 
-    const tableConfig = {
-      startY: 104,
-      head: [['#', 'Code', 'Item Description', 'Qty', 'Unit', 'Rate', 'GST%', 'GST Amt', 'Total']],
-      body: tableData,
-      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9 },
-      bodyStyles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 8 },
-        1: { cellWidth: 18 },
-        2: { cellWidth: 45 },
-        5: { halign: 'right' },
-        7: { halign: 'right' },
-        8: { halign: 'right' },
-      },
-      alternateRowStyles: { fillColor: [245, 247, 255] },
-    };
+      // Row 2: Dispatch Header (Y = 44 to 49)
+      doc.setFillColor(239, 246, 255);
+      doc.rect(10, 44, 80, 5, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.text('Dispatch / Shipped TO:', 13, 47.5);
 
-    if (typeof doc.autoTable === 'function') {
-      doc.autoTable(tableConfig);
-    } else {
-      const autoTableFunc = typeof autoTable === 'function' ? autoTable : autoTable?.default;
-      if (typeof autoTableFunc === 'function') {
-        autoTableFunc(doc, tableConfig);
-      } else {
-        throw new Error("autoTable plugin is not loaded correctly.");
+      // Row 2: Dispatch Body (Y=52 to Y=62.5)
+      doc.setFont('helvetica', 'normal');
+      const dispatchAddr = po.dispatchTo || 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC';
+      const dispatchLines = doc.splitTextToSize(dispatchAddr, 74);
+      doc.text(dispatchLines[0] || '', 13, 52.5);
+      doc.text(dispatchLines[1] || '', 13, 56);
+      doc.text(dispatchLines[2] || '', 13, 59.5);
+      doc.text(dispatchLines[3] || '', 13, 63);
+
+      // Row 3: Supplier Header (Y = 66 to 71)
+      doc.setFillColor(239, 246, 255);
+      doc.rect(10, 66, 80, 5, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.text('Supplier TO:', 13, 69.5);
+
+      // Row 3: Supplier Body (spaced 3.2mm per line, Y=74 to Y=88)
+      doc.setFont('helvetica', 'bold');
+      doc.text(`M/S;   ${vendor?.name?.toUpperCase() || 'BHAGWATI STEEL AND ALLOYS PVT.LTD'}`, 13, 74.5);
+      doc.setFont('helvetica', 'normal');
+      
+      const addr = vendor?.address || 'No. 15, Ponniamman Nagar Road, Chennai - 600095';
+      const addrLines = doc.splitTextToSize(addr, 74);
+      doc.text(addrLines[0] || '', 13, 78);
+      
+      doc.text(`MAIL:  ${vendor?.email || 'pradeepgs1@yahoo.com'}`, 13, 81.5);
+      doc.text(`GSTIN:  ${vendor?.gstin || '33AAGCB5988F1ZH'}`, 13, 85);
+      doc.text(`CONT:  ${vendor?.contact || 'ASHISH AGARWAL (9841160237)'}`, 13, 88.5);
+
+      // --- RIGHT PANEL (X: 90 to 200) ---
+      // Row 1 Divider
+      doc.line(90, 33, 200, 33);
+      doc.line(145, 20, 145, 33);
+
+      doc.setFontSize(9.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PO.NO', 102, 28);
+      doc.text(String(po.id), 125, 28);
+
+      let poDateFormatted = '—';
+      if (po.date) {
+        try {
+          poDateFormatted = format(new Date(po.date), 'dd/MM/yyyy');
+        } catch (e) {
+          poDateFormatted = po.date;
+        }
       }
+      doc.text(poDateFormatted, 160, 28);
+
+      // Row 2: Buyer's Ref
+      doc.line(90, 38, 200, 38);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Buyer's Ref/Order No.", 93, 36.5);
+
+      doc.line(90, 45, 200, 45);
+      doc.line(145, 38, 145, 45);
+      doc.setFont('helvetica', 'normal');
+      doc.text('WHATSAPP', 105, 42.5);
+      doc.text(`DBTE - ${po.workOrderNo || '202'}`, 160, 42.5);
+
+      // Row 3: Terms Header
+      doc.setFont('helvetica', 'bold');
+      doc.text('Terms and Condition:-', 93, 49.5);
+
+      // Row 3: Terms Body (X values shifted to 135 to prevent squish)
+      doc.setFont('helvetica', 'bold');
+      doc.text('DELIVERY:', 93, 55);
+      doc.setFont('helvetica', 'normal');
+      
+      let deliveryText = po.deliveryTerms || 'Within a Days';
+      if (deliveryText && (
+        /^\d{4}-\d{2}-\d{2}$/.test(deliveryText) || /^\d{4}-\d{2}-\d{2}T/.test(deliveryText)
+      )) {
+        try {
+          deliveryText = format(new Date(deliveryText), 'dd-MM-yyyy');
+        } catch (e) {
+          // ignore
+        }
+      }
+      doc.text(deliveryText, 135, 55);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('TAX:', 93, 60);
+      doc.setFont('helvetica', 'normal');
+      doc.text('EXTRA @ 18%', 135, 60);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('TRANSPORT CHARGE:', 93, 65);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Extra @ Actual', 135, 65);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('FREIGHT & FORWARDING:', 93, 70);
+      doc.setFont('helvetica', 'normal');
+      doc.text('WEIGHING / LOADING CHARGES INCLUSIVE', 135, 70);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('PAYMENT TERMS:', 93, 75);
+      doc.setFont('helvetica', 'normal');
+      doc.text(po.paymentTerms || '45 Days Credit', 135, 75);
+
+      doc.line(90, 81, 200, 81);
+
+      // Row 4: Note
+      doc.setFont('helvetica', 'bold');
+      doc.text('NOTE:', 93, 86);
+      doc.setFont('helvetica', 'normal');
+      doc.text(po.remarks || '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED', 108, 86);
+
+      // Calculate totals
+      const subtotal = po.items.reduce((acc, i) => acc + (Number(i.rate) * Number(i.qty)), 0);
+      const gstTotal = po.items.reduce((acc, i) => acc + Number(i.gstAmt), 0);
+      const grandTotal = subtotal + gstTotal;
+      const totalQty = po.items.reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
+      const mainUnit = po.items[0]?.unit || 'kgs';
+
+      // 3. Items Table
+      const tableData = po.items.map((item, idx) => [
+        idx + 1,
+        item.itemName || '—',
+        item.qty || 0,
+        item.unit || 'Nos',
+        Number(item.rate || 0).toFixed(2),
+        Number(item.total || 0).toFixed(2)
+      ]);
+
+      const tableConfig = {
+        startY: 92,
+        theme: 'grid',
+        head: [['SL. No.', 'Description Of Goods', 'QTY', 'UNIT', 'Rate', 'Total']],
+        body: tableData,
+        foot: [['', '', totalQty, mainUnit, 'GRAND TOTAL', `Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]],
+        styles: { lineColor: [0, 0, 0], lineWidth: 0.3 },
+        headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9, lineWidth: 0.3, lineColor: [0, 0, 0] },
+        bodyStyles: { textColor: [0, 0, 0], fontSize: 8.5 },
+        footStyles: { fillColor: [219, 234, 254], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9, lineWidth: 0.3, lineColor: [0, 0, 0] },
+        columnStyles: {
+          0: { cellWidth: 12, halign: 'center' },
+          1: { cellWidth: 85, halign: 'left' },
+          2: { cellWidth: 20, halign: 'center' },
+          3: { cellWidth: 18, halign: 'center' },
+          4: { cellWidth: 25, halign: 'right' },
+          5: { cellWidth: 30, halign: 'right' }
+        }
+      };
+
+      if (typeof doc.autoTable === 'function') {
+        doc.autoTable(tableConfig);
+      } else {
+        const autoTableFunc = typeof autoTable === 'function' ? autoTable : autoTable?.default;
+        if (typeof autoTableFunc === 'function') {
+          autoTableFunc(doc, tableConfig);
+        } else {
+          throw new Error("autoTable plugin is not loaded correctly.");
+        }
+      }
+
+      const finalY = (doc.lastAutoTable?.finalY || doc.previousAutoTable?.finalY || 180) + 6;
+
+      // 4. Amount in Words Box
+      doc.setFillColor(239, 246, 255); // Soft blue background
+      doc.rect(10, finalY - 4, 190, 12, 'F');
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('AMOUNT IN WORDS:', 13, finalY);
+      doc.setFont('helvetica', 'bold');
+      doc.text(numberToWords(grandTotal), 13, finalY + 5);
+
+      // 5. Signature Section
+      const sigY = finalY + 25;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('For DEEPIKA BUILTECH ENGINEERING', 200, sigY, { align: 'right' });
+      doc.text('Authorised Signatory', 200, sigY + 22, { align: 'right' });
+
+      doc.save(`${po.id}.pdf`);
+      toast.success('PO PDF downloaded in official format!');
+    } catch (err) {
+      console.error("PDF Generation Error:", err);
+      toast.error(`Failed to generate PDF: ${err.message}`);
     }
-
-    const finalY = (doc.lastAutoTable?.finalY || doc.previousAutoTable?.finalY || 150) + 5;
-    const subtotal = po.items.reduce((acc, i) => acc + (Number(i.rate) * Number(i.qty)), 0);
-    const gstTotal = po.items.reduce((acc, i) => acc + Number(i.gstAmt), 0);
-    const grandTotal = subtotal + gstTotal;
-
-    // Totals
-    doc.setFillColor(245, 247, 255);
-    doc.rect(120, finalY, 76, 30, 'F');
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
-    doc.text('Subtotal:', 125, finalY + 8);
-    doc.text(`₹${subtotal.toLocaleString()}`, 193, finalY + 8, { align: 'right' });
-    doc.text('GST Total:', 125, finalY + 15);
-    doc.text(`₹${gstTotal.toLocaleString()}`, 193, finalY + 15, { align: 'right' });
-    doc.setDrawColor(30, 64, 175);
-    doc.line(125, finalY + 18, 193, finalY + 18);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 64, 175);
-    doc.text('Grand Total:', 125, finalY + 26);
-    doc.text(`₹${grandTotal.toLocaleString()}`, 193, finalY + 26, { align: 'right' });
-
-    // Terms
-    const termsY = finalY + 38;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 30, 30);
-    doc.text('Terms & Conditions:', 14, termsY);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
-    doc.text('1. Delivery must be made within the specified time frame.', 14, termsY + 6);
-    doc.text('2. Materials must be of specified brand and quality standards.', 14, termsY + 12);
-    doc.text('3. Payment within 30 days of GRN receipt and invoice submission.', 14, termsY + 18);
-    doc.text('4. Any damage during transit is the vendor\'s responsibility.', 14, termsY + 24);
-
-    // Signature lines
-    const sigY = termsY + 38;
-    doc.setTextColor(30, 30, 30);
-    doc.line(14, sigY, 70, sigY);
-    doc.line(140, sigY, 196, sigY);
-    doc.setFontSize(9);
-    doc.text('Authorised Signatory', 14, sigY + 5);
-    doc.text('Vendor Acknowledgement', 140, sigY + 5);
-
-    doc.save(`${po.id}.pdf`);
-    toast.success('PDF downloaded!');
   };
 
   // ─── Item Handlers ────────────────────────────────────────────────────────
@@ -230,7 +380,44 @@ export default function PurchaseOrders() {
       deliveryDate: '',
       status: 'Sent',
       items: [emptyItem()],
+      dispatchTo: 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC',
+      deliveryTerms: format(new Date(), 'yyyy-MM-dd'),
+      paymentTerms: '45 Days Credit',
+      remarks: '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
     });
+  };
+
+  const handleEditClick = (po) => {
+    setEditingId(po.id || po._id);
+    setForm({
+      vendorId: po.vendorId || '',
+      projectId: po.projectId || '',
+      workOrderNo: po.workOrderNo || '',
+      date: po.date ? format(new Date(po.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+      deliveryDate: po.deliveryDate ? format(new Date(po.deliveryDate), 'yyyy-MM-dd') : '',
+      status: po.status || 'Sent',
+      items: po.items && po.items.length > 0 
+        ? po.items.map(item => ({
+            itemCode: item.itemCode || '',
+            itemName: item.itemName || '',
+            qty: item.qty || 1,
+            unit: item.unit || 'Nos',
+            rate: item.rate || 0,
+            gst: item.gst || 18,
+            gstAmt: item.gstAmt || 0,
+            total: item.total || 0,
+          }))
+        : [emptyItem()],
+      dispatchTo: po.dispatchTo || 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC',
+      deliveryTerms: po.deliveryTerms ? (
+        /^\d{4}-\d{2}-\d{2}$/.test(po.deliveryTerms) || /^\d{4}-\d{2}-\d{2}T/.test(po.deliveryTerms)
+          ? format(new Date(po.deliveryTerms), 'yyyy-MM-dd')
+          : format(new Date(), 'yyyy-MM-dd')
+      ) : format(new Date(), 'yyyy-MM-dd'),
+      paymentTerms: po.paymentTerms || '45 Days Credit',
+      remarks: po.remarks || '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
+    });
+    setShowForm(true);
   };
 
   const handleSubmit = async (e) => {
@@ -239,11 +426,22 @@ export default function PurchaseOrders() {
     if (!form.projectId) return toast.error('Please select a project.');
     if (form.items.some(it => !it.itemName.trim())) return toast.error('All items must have a name.');
     setSubmitting(true);
-    const result = await addPurchaseOrder({ ...form, date: new Date(form.date).toISOString() });
+    
+    let result;
+    if (editingId) {
+      result = await updatePurchaseOrder(editingId, { ...form, date: new Date(form.date).toISOString() });
+      if (result) {
+        toast.success('Purchase Order updated successfully!');
+      }
+    } else {
+      result = await addPurchaseOrder({ ...form, date: new Date(form.date).toISOString() });
+    }
+    
     setSubmitting(false);
     if (result) {
       setShowForm(false);
       resetForm();
+      setEditingId(null);
     }
   };
 
@@ -319,15 +517,16 @@ export default function PurchaseOrders() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="card space-y-3">
             <h3 className="font-bold text-primary border-b pb-2 uppercase tracking-wide text-sm">Vendor Details</h3>
             <p className="text-lg font-bold">{vendor?.name}</p>
             <p className="text-sm text-text-gray">Contact: {vendor?.contact}</p>
             <p className="text-sm text-text-gray">Email: {vendor?.email}</p>
+            <p className="text-sm text-text-gray">GSTIN: {vendor?.gstin}</p>
           </div>
           <div className="card space-y-3">
-            <h3 className="font-bold text-primary border-b pb-2 uppercase tracking-wide text-sm">Project & Shipping</h3>
+            <h3 className="font-bold text-primary border-b pb-2 uppercase tracking-wide text-sm">Project Details</h3>
             <p className="text-lg font-bold">{project?.name}</p>
             <p className="text-sm text-text-gray">Work Order No: {selectedPO.workOrderNo}</p>
             {selectedPO.deliveryDate && (
@@ -335,6 +534,10 @@ export default function PurchaseOrders() {
                 Expected Delivery: {format(new Date(selectedPO.deliveryDate), 'dd-MM-yyyy')}
               </p>
             )}
+          </div>
+          <div className="card space-y-3">
+            <h3 className="font-bold text-primary border-b pb-2 uppercase tracking-wide text-sm">Dispatch / Shipped TO</h3>
+            <p className="text-sm text-text-dark font-medium whitespace-pre-line">{selectedPO.dispatchTo || 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC'}</p>
           </div>
         </div>
 
@@ -389,14 +592,36 @@ export default function PurchaseOrders() {
           </div>
         </div>
 
-        <div className="card">
-          <h3 className="font-bold mb-4">Terms & Conditions</h3>
-          <p className="text-sm text-text-gray leading-relaxed">
-            1. Delivery must be made within the specified time frame.<br />
-            2. Materials must be of specified brand and quality standards.<br />
-            3. Payment will be made within 30 days of GRN receipt and invoice submission.<br />
-            4. Any damage during transit is the vendor's responsibility.
-          </p>
+        <div className="card space-y-3">
+          <h3 className="font-bold border-b pb-2 text-text-dark">Terms & Conditions</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <p className="text-text-gray text-xs uppercase tracking-wide">Delivery Date (Terms)</p>
+              <p className="font-semibold text-text-dark mt-0.5">
+                {selectedPO.deliveryTerms && (
+                  /^\d{4}-\d{2}-\d{2}$/.test(selectedPO.deliveryTerms) || /^\d{4}-\d{2}-\d{2}T/.test(selectedPO.deliveryTerms)
+                ) ? (
+                  (() => {
+                    try {
+                      return format(new Date(selectedPO.deliveryTerms), 'dd-MM-yyyy');
+                    } catch (e) {
+                      return selectedPO.deliveryTerms;
+                    }
+                  })()
+                ) : (
+                  selectedPO.deliveryTerms || 'Within a Days'
+                )}
+              </p>
+            </div>
+            <div>
+              <p className="text-text-gray text-xs uppercase tracking-wide">Payment Terms</p>
+              <p className="font-semibold text-text-dark mt-0.5">{selectedPO.paymentTerms || '45 Days Credit'}</p>
+            </div>
+            <div>
+              <p className="text-text-gray text-xs uppercase tracking-wide">Note / Instructions</p>
+              <p className="font-semibold text-text-dark mt-0.5">{selectedPO.remarks || '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED'}</p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -485,6 +710,15 @@ export default function PurchaseOrders() {
                         >
                           <Mail className="w-4 h-4" />
                         </button>
+                        {(isPurchaseTeam || isAdmin) && (
+                          <button
+                            title="Edit PO"
+                            onClick={() => handleEditClick(po)}
+                            className="p-1 text-text-gray hover:bg-primary-bg rounded"
+                          >
+                            <FileEdit className="w-4 h-4" />
+                          </button>
+                        )}
                         {isAdmin && (
                           <button
                             title="Delete PO"
@@ -519,12 +753,12 @@ export default function PurchaseOrders() {
                   <ShoppingCart className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-text-dark">New Purchase Order</h2>
-                  <p className="text-sm text-text-gray">Fill in the details to create a manual PO</p>
+                  <h2 className="text-xl font-bold text-text-dark">{editingId ? 'Edit Purchase Order' : 'New Purchase Order'}</h2>
+                  <p className="text-sm text-text-gray">{editingId ? 'Update the details of the PO' : 'Fill in the details to create a manual PO'}</p>
                 </div>
               </div>
               <button
-                onClick={() => { setShowForm(false); resetForm(); }}
+                onClick={() => { setShowForm(false); resetForm(); setEditingId(null); }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-text-gray" />
@@ -535,39 +769,31 @@ export default function PurchaseOrders() {
               {/* Basic Details */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-text-dark">Vendor *</label>
-                  <select
-                    className="input-field w-full"
+                  <Autocomplete
+                    options={vendors.map(v => ({ id: v.id, name: v.name }))}
+                    onSelect={(v) => setForm(f => ({ ...f, vendorId: v.id }))}
+                    placeholder="Search/Select Vendor..."
+                    label="Vendor *"
                     value={form.vendorId}
-                    onChange={e => setForm(f => ({ ...f, vendorId: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select Vendor</option>
-                    {vendors.map(v => (
-                      <option key={v.id} value={v.id}>{v.name}</option>
-                    ))}
-                  </select>
+                    onAddNew={handleAddNewVendor}
+                  />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-text-dark">Project *</label>
-                  <select
-                    className="input-field w-full"
+                  <Autocomplete
+                    options={projects.map(p => ({ id: p.id, name: p.name }))}
+                    onSelect={(p) => setForm(f => ({ ...f, projectId: p.id }))}
+                    placeholder="Search/Select Project..."
+                    label="Project *"
                     value={form.projectId}
-                    onChange={e => setForm(f => ({ ...f, projectId: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select Project</option>
-                    {projects.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                    onAddNew={handleAddNewProject}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-text-dark">Work Order No.</label>
                   <input
                     className="input-field w-full"
                     type="text"
-                    placeholder="e.g. WO-2024-001"
+                    placeholder="e.g. DBTE - 1212"
                     value={form.workOrderNo}
                     onChange={e => setForm(f => ({ ...f, workOrderNo: e.target.value }))}
                   />
@@ -602,7 +828,74 @@ export default function PurchaseOrders() {
                     <option value="Sent">Sent</option>
                     <option value="Partial">Partial</option>
                     <option value="Received">Received</option>
+                    <option value="Cancelled">Cancelled</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Shipping & Dispatch Address */}
+              <div className="card space-y-1 relative">
+                <label className="text-sm font-medium text-text-dark">Dispatch / Shipped TO Address *</label>
+                <div className="relative">
+                  <textarea
+                    className="input-field w-full h-24 resize-none pl-3 pt-2 text-sm"
+                    placeholder="Enter full address details for Shipped TO..."
+                    value={form.dispatchTo}
+                    onChange={e => setForm(f => ({ ...f, dispatchTo: e.target.value }))}
+                    onFocus={() => setShowDispatchSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowDispatchSuggestions(false), 250)}
+                  />
+                  {showDispatchSuggestions && filteredDispatchSuggestions.length > 0 && (
+                    <div className="absolute z-[60] w-full mt-1 bg-white border border-border rounded-lg shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                      {filteredDispatchSuggestions.map((addr, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          className="w-full text-left px-4 py-3 hover:bg-primary-bg transition-colors border-b border-border text-xs font-medium text-text-dark whitespace-pre-line"
+                          onClick={() => {
+                            setForm(f => ({ ...f, dispatchTo: addr }));
+                            setShowDispatchSuggestions(false);
+                          }}
+                        >
+                          {addr}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Terms & Conditions */}
+              <div className="card grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-text-dark">Delivery Date (Terms) *</label>
+                  <input
+                    className="input-field w-full"
+                    type="date"
+                    value={form.deliveryTerms}
+                    onChange={e => setForm(f => ({ ...f, deliveryTerms: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-text-dark">Payment Terms / Days</label>
+                  <input
+                    className="input-field w-full"
+                    type="text"
+                    placeholder="e.g. 45 Days Credit"
+                    value={form.paymentTerms}
+                    onChange={e => setForm(f => ({ ...f, paymentTerms: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-text-dark">Note / Instructions</label>
+                  <input
+                    className="input-field w-full"
+                    type="text"
+                    placeholder="e.g. * ALONG WITH INVOICE , MIL TEST..."
+                    value={form.remarks}
+                    onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))}
+                  />
                 </div>
               </div>
 
@@ -741,7 +1034,7 @@ export default function PurchaseOrders() {
               <div className="flex justify-end gap-3 pt-2 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => { setShowForm(false); resetForm(); }}
+                  onClick={() => { setShowForm(false); resetForm(); setEditingId(null); }}
                   className="px-5 py-2 rounded-lg border border-border text-text-gray hover:bg-gray-50 font-medium transition-colors"
                 >
                   Cancel
@@ -756,7 +1049,7 @@ export default function PurchaseOrders() {
                   ) : (
                     <CheckCircle className="w-4 h-4" />
                   )}
-                  {submitting ? 'Creating...' : 'Create Purchase Order'}
+                  {submitting ? (editingId ? 'Saving...' : 'Creating...') : (editingId ? 'Save Changes' : 'Create Purchase Order')}
                 </button>
               </div>
             </form>

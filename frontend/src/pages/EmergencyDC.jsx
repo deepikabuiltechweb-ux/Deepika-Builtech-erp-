@@ -20,10 +20,10 @@ const PAYMENT_MODES = ['Cash', 'UPI', 'Card', 'Credit'];
 const EMERGENCY_REASONS = [
   'Project Deadline - Material Shortage',
   'Machine Breakdown - Urgent Repair',
-  'Site Emergency - Safety Critical',
+  'Safety Critical Requirement',
   'Stock Out - Work Stoppage Risk',
   'Vendor Delay - Alternative Source',
-  'Other Emergency'
+  'Other Reason / Justification'
 ];
 
 const statusConfig = {
@@ -56,7 +56,7 @@ export default function EmergencyDC() {
     const doc = new jsPDF();
 
     // Header banner
-    doc.setFillColor(239, 68, 68); // Red-Orange theme for site emergency
+    doc.setFillColor(30, 64, 175); // Dark Blue corporate theme
     doc.rect(0, 0, 210, 42, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(20);
@@ -68,12 +68,12 @@ export default function EmergencyDC() {
     doc.text('GSTIN: 29ABCDE1234F1Z5  |  Tel: +91 80 1234 5678', 105, 34, { align: 'center' });
 
     // Title strip
-    doc.setFillColor(254, 242, 242);
+    doc.setFillColor(239, 246, 255); // Soft blue background
     doc.rect(0, 42, 210, 12, 'F');
-    doc.setTextColor(185, 28, 28);
+    doc.setTextColor(30, 64, 175);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('EMERGENCY LOCAL PURCHASE CHALLAN', 14, 51);
+    doc.text('LOCAL PURCHASE DELIVERY CHALLAN', 14, 51);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(60, 60, 60);
@@ -88,7 +88,7 @@ export default function EmergencyDC() {
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(185, 28, 28);
+    doc.setTextColor(30, 64, 175); // Corporate Blue
     doc.text('LOCAL VENDOR / SHOP', 17, 67);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(30, 30, 30);
@@ -97,7 +97,7 @@ export default function EmergencyDC() {
     doc.text(`Address: ${dc.localVendorAddress || '—'}`, 17, 86);
 
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(185, 28, 28);
+    doc.setTextColor(30, 64, 175); // Corporate Blue
     doc.text('PURCHASE / PROJECT INFO', 114, 67);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(30, 30, 30);
@@ -105,12 +105,12 @@ export default function EmergencyDC() {
     doc.text(`Purchased By: ${dc.purchasedBy || '—'}`, 114, 80);
     doc.text(`Payment: ${dc.paymentMode || '—'} (Bill attached: ${dc.billAttached ? 'YES' : 'NO'})`, 114, 86);
 
-    // Emergency Reason Section
-    doc.setFillColor(255, 247, 237);
+    // Challan Justification Section
+    doc.setFillColor(245, 247, 255); // Soft blue background
     doc.rect(14, 104, 182, 10, 'F');
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(234, 88, 12);
+    doc.setTextColor(30, 64, 175); // Corporate Blue
     doc.text(`JUSTIFICATION: ${dc.emergencyReason || '—'}`, 18, 110);
 
     // Items Table
@@ -119,15 +119,15 @@ export default function EmergencyDC() {
       item.description,
       item.qty,
       item.unit || 'Nos',
-      `₹${Number(item.unitPrice).toLocaleString()}`,
-      `₹${Number(item.totalPrice).toLocaleString()}`
+      `Rs. ${Number(item.unitPrice).toLocaleString()}`,
+      `Rs. ${Number(item.totalPrice).toLocaleString()}`
     ]);
 
     const tableConfig = {
       startY: 118,
       head: [['#', 'Material / Item Description', 'Quantity', 'Unit', 'Unit Price', 'Total Price']],
       body: tableData,
-      headStyles: { fillColor: [185, 28, 28], textColor: 255, fontSize: 9 },
+      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9 }, // Corporate Blue Header
       bodyStyles: { fontSize: 9 },
       columnStyles: {
         0: { cellWidth: 8 },
@@ -135,7 +135,7 @@ export default function EmergencyDC() {
         4: { halign: 'right', cellWidth: 32 },
         5: { halign: 'right', cellWidth: 32 }
       },
-      alternateRowStyles: { fillColor: [255, 242, 242] },
+      alternateRowStyles: { fillColor: [245, 247, 255] }, // Soft Blue alternate rows
     };
 
     if (typeof doc.autoTable === 'function') {
@@ -152,13 +152,13 @@ export default function EmergencyDC() {
     const finalY = (doc.lastAutoTable?.finalY || doc.previousAutoTable?.finalY || 150) + 5;
 
     // Grand Total Box
-    doc.setFillColor(254, 242, 242);
+    doc.setFillColor(245, 247, 255); // Soft Blue Box
     doc.rect(120, finalY, 76, 12, 'F');
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(185, 28, 28);
+    doc.setTextColor(30, 64, 175); // Corporate Blue
     doc.text('Grand Total:', 125, finalY + 8);
-    doc.text(`₹${Number(dc.totalAmount).toLocaleString()}`, 193, finalY + 8, { align: 'right' });
+    doc.text(`Rs. ${Number(dc.totalAmount).toLocaleString()}`, 193, finalY + 8, { align: 'right' });
 
     // Remarks
     if (dc.remarks) {
@@ -179,7 +179,7 @@ export default function EmergencyDC() {
     doc.text('Approved / Authorized By', 140, sigY + 5);
 
     doc.save(`${dc.id}.pdf`);
-    toast.success('Emergency DC PDF downloaded!');
+    toast.success('Delivery Challan PDF downloaded!');
   };
 
   const [form, setForm] = useState({
@@ -229,7 +229,7 @@ export default function EmergencyDC() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.localVendorName.trim()) { toast.error('Local vendor name is required'); return; }
-    if (!form.emergencyReason) { toast.error('Please select an emergency reason'); return; }
+    if (!form.emergencyReason) { toast.error('Please select a reason / justification'); return; }
     if (form.items.some(i => !i.description.trim())) { toast.error('All item descriptions are required'); return; }
 
     const payload = { ...form, totalAmount: grandTotal };
@@ -271,12 +271,12 @@ export default function EmergencyDC() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-            <AlertTriangle className="w-6 h-6 text-orange-600" />
+          <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+            <ClipboardList className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-text-dark">Emergency DC</h1>
-            <p className="text-text-gray text-sm">Local purchase delivery challans for emergency material requirements</p>
+            <h1 className="text-2xl font-bold text-text-dark">Delivery Challan</h1>
+            <p className="text-text-gray text-sm">Local purchase delivery challans for project materials</p>
           </div>
         </div>
         {!showForm && (
@@ -285,7 +285,7 @@ export default function EmergencyDC() {
             className="btn-primary flex items-center gap-2 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            New Emergency DC
+            New Delivery Challan
           </button>
         )}
       </div>
@@ -315,12 +315,12 @@ export default function EmergencyDC() {
       {/* FORM */}
       {showForm ? (
         <form onSubmit={handleSubmit} className="space-y-6 animate-in slide-in-from-top-4 duration-300">
-          {/* Emergency Banner */}
-          <div className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-xl">
-            <AlertTriangle className="w-6 h-6 text-orange-500 shrink-0" />
+          {/* DC Info Banner */}
+          <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <ClipboardList className="w-6 h-6 text-primary shrink-0" />
             <div>
-              <p className="font-semibold text-orange-800">Emergency Local Purchase DC</p>
-              <p className="text-sm text-orange-600">This challan is for materials procured locally during an emergency period. Requires admin approval.</p>
+              <p className="font-semibold text-primary-dark">Local Purchase Delivery Challan</p>
+              <p className="text-sm text-primary">This challan records materials procured locally. Requires administrative approval.</p>
             </div>
           </div>
 
@@ -366,14 +366,14 @@ export default function EmergencyDC() {
             </div>
           </div>
 
-          {/* Section 2: Emergency Info */}
+          {/* Section 2: Justification Info */}
           <div className="card">
             <h3 className="font-bold text-text-dark mb-4 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-orange-500" /> Emergency Details
+              <ClipboardList className="w-5 h-5 text-primary" /> Challan Justification
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-text-gray mb-1">Emergency Reason *</label>
+                <label className="block text-sm font-medium text-text-gray mb-1">Reason / Justification *</label>
                 <select
                   className="input-field"
                   value={form.emergencyReason}
@@ -606,8 +606,8 @@ export default function EmergencyDC() {
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary px-8 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  Submit Emergency DC
+                  <CheckCircle className="w-4 h-4" />
+                  Submit Delivery Challan
                 </button>
               </div>
             </div>
@@ -664,7 +664,7 @@ export default function EmergencyDC() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="p-10 text-center text-text-gray italic">
-                      No Emergency DCs found.
+                      No Delivery Challans found.
                     </td>
                   </tr>
                 ) : (
@@ -735,7 +735,7 @@ export default function EmergencyDC() {
                           {isAdmin && (
                             <button
                               onClick={() => {
-                                if (window.confirm('Delete this Emergency DC?')) {
+                                if (window.confirm('Delete this Delivery Challan?')) {
                                   deleteEmergencyDC(dc.id);
                                 }
                               }}
@@ -766,8 +766,8 @@ export default function EmergencyDC() {
             {/* Modal Header */}
             <div className="p-6 border-b flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
-                  <AlertTriangle className="w-6 h-6 text-orange-600" />
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <ClipboardList className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <div className="flex items-center gap-3">
@@ -788,10 +788,10 @@ export default function EmergencyDC() {
             </div>
 
             <div className="p-6 space-y-5">
-              {/* Emergency Info */}
-              <div className="p-4 bg-orange-50 rounded-xl border border-orange-100">
-                <p className="text-xs uppercase font-bold tracking-widest text-orange-500 mb-1">Emergency Reason</p>
-                <p className="font-semibold text-orange-800">{viewDC.emergencyReason}</p>
+              {/* Justification Info */}
+              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <p className="text-xs uppercase font-bold tracking-widest text-primary mb-1">Reason / Justification</p>
+                <p className="font-semibold text-primary-dark">{viewDC.emergencyReason}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">

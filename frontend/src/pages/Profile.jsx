@@ -160,7 +160,7 @@ export default function Profile() {
               </div>
               <div className="bg-primary-bg p-3 rounded-lg border border-border">
                 <p className="text-2xl font-bold text-primary">{userEmergencyDCCount}</p>
-                <p className="text-[10px] text-text-gray uppercase tracking-wider mt-0.5">Emergency DCs</p>
+                <p className="text-[10px] text-text-gray uppercase tracking-wider mt-0.5">Delivery Challans</p>
               </div>
             </div>
           </div>

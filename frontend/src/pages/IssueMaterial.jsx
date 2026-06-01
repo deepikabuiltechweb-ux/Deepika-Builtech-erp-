@@ -78,8 +78,8 @@ export default function IssueMaterial() {
       item.name,
       item.qty,
       item.unit || 'Nos',
-      `₹${Number(item.rate).toLocaleString()}`,
-      `₹${Number(item.qty * item.rate).toLocaleString()}`
+      `Rs. ${Number(item.rate).toLocaleString()}`,
+      `Rs. ${Number(item.qty * item.rate).toLocaleString()}`
     ]);
 
     const tableConfig = {
@@ -117,7 +117,7 @@ export default function IssueMaterial() {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 64, 175);
     doc.text('Grand Total:', 125, finalY + 8);
-    doc.text(`₹${Number(issue.totalCost).toLocaleString()}`, 193, finalY + 8, { align: 'right' });
+    doc.text(`Rs. ${Number(issue.totalCost).toLocaleString()}`, 193, finalY + 8, { align: 'right' });
 
     // Signature lines
     const sigY = finalY + 28;
