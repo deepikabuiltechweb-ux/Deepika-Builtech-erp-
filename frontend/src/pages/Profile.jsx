@@ -104,49 +104,92 @@ export default function Profile() {
         {/* Left Column: User Card & Permission Scopes */}
         <div className="space-y-6 lg:col-span-1">
           {/* Main User Card */}
+          {/* Main User Card */}
           <div className="card text-center p-6 space-y-4 flex flex-col items-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full translate-x-8 -translate-y-8" />
-            
-            <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-inner relative overflow-hidden shrink-0">
-              {user?.profileImage ? (
-                <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-12 h-12" />
-              )}
-              <span className="absolute bottom-0 right-0 w-6 h-6 bg-success rounded-full border-2 border-white flex items-center justify-center z-10">
-                <CheckCircle className="w-4 h-4 text-white" />
-              </span>
-            </div>
-            
-            {['admin', 'superadmin', 'store_team', 'purchase_team'].includes(user?.role) && (
-              <div className="flex flex-col items-center gap-1.5">
-                <label className="cursor-pointer text-[11px] font-bold text-primary hover:underline bg-primary/5 hover:bg-primary/10 px-3 py-1 rounded-full border border-primary/10 transition-all flex items-center gap-1">
-                  Upload Image
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageUpload}
-                  />
+
+            {/* Avatar — editable for purchase/store/admin roles */}
+            {['admin', 'superadmin', 'store_team', 'purchase_team'].includes(user?.role) ? (
+              <div className="flex flex-col items-center gap-3 w-full">
+                {/* Clickable avatar with camera overlay */}
+                <label className="relative cursor-pointer group" title="Click to change photo">
+                  <div className="w-28 h-28 rounded-full bg-primary/10 border-2 border-primary/20 shadow-inner relative overflow-hidden flex items-center justify-center text-primary transition-all group-hover:border-primary group-hover:shadow-lg">
+                    {user?.profileImage ? (
+                      <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-14 h-14 opacity-50" />
+                    )}
+                    <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 rounded-full">
+                      <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="text-[10px] font-bold text-white">{user?.profileImage ? 'Change' : 'Upload'}</span>
+                    </div>
+                    <span className="absolute bottom-1 right-1 w-5 h-5 bg-success rounded-full border-2 border-white flex items-center justify-center z-10">
+                      <CheckCircle className="w-3 h-3 text-white" />
+                    </span>
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isUpdatingProfile} />
                 </label>
+
+                {/* Upload drop zone (only when no image) */}
+                {!user?.profileImage && (
+                  <label className="w-full flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-primary/30 hover:border-primary/70 bg-primary/3 hover:bg-primary/5 rounded-xl py-4 px-3 cursor-pointer transition-all group">
+                    <svg className="w-6 h-6 text-primary/50 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <p className="text-xs font-bold text-primary/70 group-hover:text-primary transition-colors">Upload Profile Photo</p>
+                    <p className="text-[10px] text-text-gray">JPG, PNG, GIF — max 2 MB</p>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isUpdatingProfile} />
+                  </label>
+                )}
+
+                {/* Change / Remove buttons (when image exists) */}
                 {user?.profileImage && (
-                  <button
-                    onClick={async () => {
-                      if (window.confirm("Are you sure you want to remove your profile image?")) {
-                        setIsUpdatingProfile(true);
-                        await updateProfile({ profileImage: null });
-                        setIsUpdatingProfile(false);
-                        toast.success("Profile image removed");
-                      }
-                    }}
-                    type="button"
-                    className="text-[9px] font-bold text-error hover:underline"
-                  >
-                    Remove Image
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <label className="cursor-pointer text-[11px] font-bold text-primary bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-full border border-primary/15 transition-all flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      Change Photo
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isUpdatingProfile} />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm('Remove your profile photo?')) {
+                          setIsUpdatingProfile(true);
+                          await updateProfile({ profileImage: null });
+                          setIsUpdatingProfile(false);
+                          toast.success('Profile photo removed');
+                        }
+                      }}
+                      className="text-[11px] font-bold text-error bg-error/5 hover:bg-error/10 px-3 py-1.5 rounded-full border border-error/15 transition-all"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+
+                {isUpdatingProfile && (
+                  <p className="text-[10px] text-primary animate-pulse font-semibold tracking-wide">Saving changes...</p>
                 )}
               </div>
+            ) : (
+              /* Non-editable roles: read-only avatar */
+              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-inner relative overflow-hidden shrink-0">
+                {user?.profileImage ? (
+                  <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-12 h-12" />
+                )}
+                <span className="absolute bottom-0 right-0 w-6 h-6 bg-success rounded-full border-2 border-white flex items-center justify-center z-10">
+                  <CheckCircle className="w-4 h-4 text-white" />
+                </span>
+              </div>
             )}
+
             
             <div>
               <h2 className="text-lg font-bold text-text-dark">{user?.name}</h2>
