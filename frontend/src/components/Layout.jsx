@@ -57,8 +57,12 @@ export default function Layout({ children }) {
                 <p className="text-sm font-semibold text-text-dark">{user?.name || 'Guest User'}</p>
                 <p className="text-xs text-text-gray">{displayRole}</p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
-                <User className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 hover:bg-primary/20 transition-colors overflow-hidden shrink-0">
+                {user?.profileImage ? (
+                  <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-6 h-6" />
+                )}
               </div>
             </Link>
           </div>

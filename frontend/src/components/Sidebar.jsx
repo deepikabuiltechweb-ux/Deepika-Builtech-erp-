@@ -123,10 +123,12 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
                 className="p-3 bg-white/10 rounded-xl flex items-center gap-3 hover:bg-white/20 transition-all cursor-pointer select-none block"
              >
                 <div className={cn(
-                   "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                   user?.role === 'admin' ? "bg-success" : user?.role === 'viewer' ? "bg-sky-500" : "bg-warning"
+                   "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden bg-white/10",
+                   !user?.profileImage && (user?.role === 'admin' ? "bg-success" : user?.role === 'viewer' ? "bg-sky-500" : "bg-warning")
                 )}>
-                   {user?.role === 'admin' ? (
+                   {user?.profileImage ? (
+                     <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                   ) : user?.role === 'admin' ? (
                      <ShieldCheck className="w-5 h-5 text-white" />
                    ) : user?.role === 'viewer' ? (
                      <Eye className="w-5 h-5 text-white" />
