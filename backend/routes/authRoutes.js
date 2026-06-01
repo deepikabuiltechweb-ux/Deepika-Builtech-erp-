@@ -76,6 +76,7 @@ router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
     name: user.name,
     email: user.email,
     role: user.role,
+    profileImage: user.profileImage,
     token: accessToken // Send token for fallback
   });
 }));
@@ -97,6 +98,7 @@ router.put('/profile', protect, asyncHandler(async (req, res) => {
 
   user.name = req.body.name || user.name;
   user.email = req.body.email || user.email;
+  user.profileImage = req.body.profileImage !== undefined ? req.body.profileImage : user.profileImage;
 
   if (req.body.password) {
     user.password = req.body.password;
@@ -109,6 +111,7 @@ router.put('/profile', protect, asyncHandler(async (req, res) => {
     name: updatedUser.name,
     email: updatedUser.email,
     role: updatedUser.role,
+    profileImage: updatedUser.profileImage,
     token: req.cookies?.accessToken || req.headers.authorization?.split(' ')[1]
   });
 }));

@@ -8,7 +8,8 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['superadmin', 'admin', 'manager', 'staff', 'employee', 'viewer', 'store_team', 'purchase_team'], default: 'employee' },
   loginAttempts: { type: Number, default: 0 },
   lockUntil: { type: Date },
-  refreshToken: { type: String }
+  refreshToken: { type: String },
+  profileImage: { type: String }
 }, { timestamps: true });
 
 // Indexing

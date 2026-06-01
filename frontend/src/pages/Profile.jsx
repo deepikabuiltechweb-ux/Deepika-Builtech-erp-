@@ -19,6 +19,31 @@ export default function Profile() {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image size must be under 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result;
+      setIsUpdatingProfile(true);
+      const success = await updateProfile({ profileImage: base64 });
+      setIsUpdatingProfile(false);
+      if (success) {
+        toast.success("Profile image updated successfully!");
+      }
+    };
+    reader.onerror = () => {
+      toast.error("Error reading file");
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
     if (!profileForm.name.trim()) return toast.error("Name is required");
@@ -82,12 +107,46 @@ export default function Profile() {
           <div className="card text-center p-6 space-y-4 flex flex-col items-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full translate-x-8 -translate-y-8" />
             
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-inner relative">
-              <User className="w-10 h-10" />
-              <span className="absolute bottom-0 right-0 w-5 h-5 bg-success rounded-full border-2 border-white flex items-center justify-center">
-                <CheckCircle className="w-3.5 h-3.5 text-white" />
+            <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-inner relative overflow-hidden shrink-0">
+              {user?.profileImage ? (
+                <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-12 h-12" />
+              )}
+              <span className="absolute bottom-0 right-0 w-6 h-6 bg-success rounded-full border-2 border-white flex items-center justify-center z-10">
+                <CheckCircle className="w-4 h-4 text-white" />
               </span>
             </div>
+            
+            {['admin', 'superadmin', 'store_team', 'purchase_team'].includes(user?.role) && (
+              <div className="flex flex-col items-center gap-1.5">
+                <label className="cursor-pointer text-[11px] font-bold text-primary hover:underline bg-primary/5 hover:bg-primary/10 px-3 py-1 rounded-full border border-primary/10 transition-all flex items-center gap-1">
+                  Upload Image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                </label>
+                {user?.profileImage && (
+                  <button
+                    onClick={async () => {
+                      if (window.confirm("Are you sure you want to remove your profile image?")) {
+                        setIsUpdatingProfile(true);
+                        await updateProfile({ profileImage: null });
+                        setIsUpdatingProfile(false);
+                        toast.success("Profile image removed");
+                      }
+                    }}
+                    type="button"
+                    className="text-[9px] font-bold text-error hover:underline"
+                  >
+                    Remove Image
+                  </button>
+                )}
+              </div>
+            )}
             
             <div>
               <h2 className="text-lg font-bold text-text-dark">{user?.name}</h2>
