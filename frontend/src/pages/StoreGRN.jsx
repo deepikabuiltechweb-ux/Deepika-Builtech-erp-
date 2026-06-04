@@ -196,7 +196,7 @@ export default function StoreGRN() {
     e.preventDefault();
     const po = purchaseOrders.find(p => p.id === formData.poRef);
     const vendorId = po?.vendorId || '';
-    const vendorName = vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor';
+    const vendorName = po?.vendorName || vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor';
     const newGRN = {
       ...formData,
       poId: formData.poRef,
@@ -249,7 +249,7 @@ export default function StoreGRN() {
                 <Autocomplete
                   options={purchaseOrders
                     .filter(p => p.status !== 'Complete')
-                    .map(p => ({ ...p, name: `${p.id} - ${vendors.find(v => v.id === p.vendorId)?.name || 'Unknown'}` }))}
+                    .map(p => ({ ...p, name: `${p.id} - ${p.vendorName || vendors.find(v => v.id === p.vendorId)?.name || 'Unknown'}` }))}
                   onSelect={(po) => handlePOSelect(po.id)}
                   placeholder="Search Pending PO..."
                   value={formData.poRef}
@@ -439,7 +439,7 @@ export default function StoreGRN() {
                        purchaseOrders.filter(p => p.status === 'Sent' || p.status === 'Partial').map(p => (
                           <div key={p.id} className="p-3 bg-white/10 rounded-lg border border-white/10">
                              <p className="font-bold">{p.id}</p>
-                             <p className="text-xs text-white/70">{vendors.find(v => v.id === p.vendorId)?.name}</p>
+                             <p className="text-xs text-white/70">{p.vendorName || vendors.find(v => v.id === p.vendorId)?.name || 'Unknown Vendor'}</p>
                              <div className="mt-2 flex justify-between items-center">
                                 <span className="text-[10px] uppercase tracking-wider font-bold text-warning">{p.status}</span>
                                 <div className="flex gap-2">
@@ -577,9 +577,10 @@ export default function StoreGRN() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-primary-bg p-4 rounded-xl border border-border space-y-2">
                   <h3 className="font-bold text-primary text-xs uppercase tracking-wider">Vendor Details</h3>
-                  <p className="font-bold text-text-dark text-base">{vendors.find(v => v.id === selectedPO.vendorId)?.name || 'Unknown Vendor'}</p>
-                  <p className="text-sm text-text-gray">Contact: {vendors.find(v => v.id === selectedPO.vendorId)?.contact || '—'}</p>
-                  <p className="text-sm text-text-gray">Email: {vendors.find(v => v.id === selectedPO.vendorId)?.email || '—'}</p>
+                  <p className="font-bold text-text-dark text-base">{selectedPO.vendorName || vendors.find(v => v.id === selectedPO.vendorId)?.name || 'Unknown Vendor'}</p>
+                  <p className="text-sm text-text-gray">Address: {[selectedPO.vendorAddressLine1, selectedPO.vendorAddressLine2, selectedPO.vendorCityPin].filter(Boolean).join(', ') || vendors.find(v => v.id === selectedPO.vendorId)?.address || '—'}</p>
+                  <p className="text-sm text-text-gray">Contact: {selectedPO.vendorContact || vendors.find(v => v.id === selectedPO.vendorId)?.contact || '—'}</p>
+                  <p className="text-sm text-text-gray">Email: {selectedPO.vendorEmail || vendors.find(v => v.id === selectedPO.vendorId)?.email || '—'}</p>
                 </div>
                 
                 <div className="bg-primary-bg p-4 rounded-xl border border-border space-y-2">

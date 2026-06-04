@@ -14,7 +14,18 @@ const purchaseOrderSchema = new mongoose.Schema({
   paymentTerms: { type: String },
   dispatchTo: { type: String },
   remarks: { type: String },
-  reference: { type: String }
+  reference: { type: String },
+  vendorName: { type: String },
+  vendorAddressLine1: { type: String },
+  vendorAddressLine2: { type: String },
+  vendorCityPin: { type: String },
+  vendorGstin: { type: String },
+  vendorContact: { type: String },
+  vendorEmail: { type: String },
+  freightCharges: { type: Number, default: 0 },
+  loadingCharges: { type: Number, default: 0 },
+  unloadingCharges: { type: Number, default: 0 },
+  weighingCharges: { type: Number, default: 0 }
 }, { timestamps: true });
 
 export default mongoose.model('PurchaseOrder', purchaseOrderSchema);

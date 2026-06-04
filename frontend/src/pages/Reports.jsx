@@ -146,7 +146,7 @@ export default function Reports() {
   };
 
   const filteredPurchaseOrders = purchaseOrders.filter(po => {
-    const vendorName = vendors.find(v => v.id === po.vendorId)?.name || 'N/A';
+    const vendorName = po.vendorName || vendors.find(v => v.id === po.vendorId)?.name || 'N/A';
     const projectName = projects.find(p => p.id === po.projectId)?.name || 'N/A';
     return isWithinDateRange(po.date) && matchesSearch(po, [
       'id', 'status', () => vendorName, () => projectName
@@ -198,7 +198,7 @@ export default function Reports() {
         return filteredPurchaseOrders.map(po => ({
           'PO No': po.id,
           'Date': format(new Date(po.date), 'dd-MM-yyyy'),
-          'Vendor': vendors.find(v => v.id === po.vendorId)?.name || 'N/A',
+          'Vendor': po.vendorName || vendors.find(v => v.id === po.vendorId)?.name || 'N/A',
           'Project': projects.find(p => p.id === po.projectId)?.name || 'N/A',
           'Amount': po.items.reduce((acc, i) => acc + i.total, 0),
           'Status': po.status
@@ -315,7 +315,7 @@ export default function Reports() {
                   <tr key={po.id}>
                     <td>{format(new Date(po.date), 'dd-MM-yyyy')}</td>
                     <td className="font-bold text-primary">{po.id}</td>
-                    <td>{vendors.find(v => v.id === po.vendorId)?.name || 'N/A'}</td>
+                    <td>{po.vendorName || vendors.find(v => v.id === po.vendorId)?.name || 'N/A'}</td>
                     <td>{projects.find(p => p.id === po.projectId)?.name || 'N/A'}</td>
                     <td className="text-right font-bold">₹{po.items.reduce((acc, i) => acc + i.total, 0).toLocaleString()}</td>
                     <td><span className="badge badge-primary">{po.status}</span></td>

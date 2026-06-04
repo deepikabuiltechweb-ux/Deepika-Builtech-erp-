@@ -35,182 +35,180 @@ export default function Vendors() {
       const project = projects.find(p => p.id === po.projectId);
       const doc = new jsPDF();
 
+      // Vendor fallback mapping
+      const vName = po.vendorName || vendor?.name || '—';
+      const vContact = po.vendorContact || vendor?.contact || '—';
+      const vEmail = po.vendorEmail || vendor?.email || '—';
+      const vGstin = po.vendorGstin || vendor?.gstin || '—';
+      
+      const vAddressParts = [
+        po.vendorAddressLine1,
+        po.vendorAddressLine2,
+        po.vendorCityPin
+      ].filter(Boolean);
+      const vAddress = vAddressParts.length > 0 ? vAddressParts.join('\n') : (vendor?.address || '—');
+
       // Number to Words converter (Indian System: Lakhs & Crores)
       const numberToWords = (num) => {
         const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
         const b = ['', '', 'Twenty ', 'Thirty ', 'Forty ', 'Fifty ', 'Sixty ', 'Seventy ', 'Eighty ', 'Ninety '];
-        
+
         const numStr = Math.round(num).toString();
         if (Math.round(num) === 0) return 'Zero Only';
         if (numStr.length > 9) return 'Amount too large';
-        
+
         const n = ('000000000' + numStr).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
         if (!n) return '';
-        
+
         let str = '';
         str += Number(n[1]) !== 0 ? (a[Number(n[1])] || b[n[1][0]] + a[n[1][1]]) + 'Crore ' : '';
         str += Number(n[2]) !== 0 ? (a[Number(n[2])] || b[n[2][0]] + a[n[2][1]]) + 'Lakh ' : '';
         str += Number(n[3]) !== 0 ? (a[Number(n[3])] || b[n[3][0]] + a[n[3][1]]) + 'Thousand ' : '';
         str += Number(n[4]) !== 0 ? a[Number(n[4])] + 'Hundred ' : '';
         str += Number(n[5]) !== 0 ? ((str !== '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + a[n[5][1]]) : '';
-        
+
         return str.trim() + ' Only';
       };
 
       // Styles
       doc.setFont('helvetica', 'normal');
-      doc.setDrawColor(0, 0, 0); // Black borders
+      doc.setDrawColor(226, 232, 240); // Soft border
       doc.setLineWidth(0.4);
 
       // 1. Purchase Order Title Strip
       doc.setFillColor(219, 234, 254); // Light blue background
-      doc.rect(10, 10, 190, 10, 'FD');
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(13);
+      doc.rect(10, 10, 190, 8, 'FD');
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('PURCHASE ORDER', 105, 17, { align: 'center' });
+      doc.text('PURCHASE ORDER', 105, 15.5, { align: 'center' });
 
-      // 2. Bounding Grid Box (Y=20 to Y=90)
-      doc.rect(10, 20, 190, 70, 'D');
+      // 2. Company Details & PO Header Block
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(10, 21, 190, 25, 'D');
+      doc.line(115, 21, 115, 46); // Vertical divider
 
-      // Vertical Divider splits Left Panel (width 80) and Right Panel (width 110)
-      doc.line(90, 20, 90, 90);
-
-      // --- LEFT PANEL (X: 10 to 90) ---
-      // Row 1: Deepika Address (spaced 3.5mm per line, fits Y=20 to Y=42)
+      // Deepika Address
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'bold');
-      doc.text('DEEPIKA BUILTECH ENGINEERING', 13, 23.5);
+      doc.text('DEEPIKA BUILTECH ENGINEERING', 13, 26);
       doc.setFont('helvetica', 'normal');
-      doc.text('Survey No.44/5, Rajakulam Road,', 13, 27);
-      doc.text('Vaivayur Post, Karur Village, Kanchipuram - 631 561', 13, 30.5);
-      doc.text('Phone: 044-26256416, 29565416', 13, 34);
-      doc.text('mail: dbtechengg@gmail.com', 13, 37.5);
-      doc.text('GSTIN: 33AEGPL3660M1ZC', 13, 41);
-
-      // Row 2: Dispatch Header (Y = 44 to 49)
-      doc.setFillColor(239, 246, 255);
-      doc.rect(10, 44, 80, 5, 'FD');
+      doc.text('Survey No.44/5, Rajakulam Road,', 13, 30);
+      doc.text('Vaivayur Post, Karur Village, Kanchipuram - 631 561', 13, 34);
+      doc.text('Phone: 044-26256416, 29565416  |  Mail: dbtechengg@gmail.com', 13, 38);
       doc.setFont('helvetica', 'bold');
-      doc.text('Dispatch / Shipped TO:', 13, 47.5);
+      doc.text('GSTIN: 33AEGPL3660M1ZC', 13, 42);
 
-      // Row 2: Dispatch Body (Y=52 to Y=62.5)
+      // PO Details
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PO Number:', 118, 26);
       doc.setFont('helvetica', 'normal');
-      const dispatchAddr = po.dispatchTo || 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC';
-      const dispatchLines = doc.splitTextToSize(dispatchAddr, 74);
-      doc.text(dispatchLines[0] || '', 13, 52.5);
-      doc.text(dispatchLines[1] || '', 13, 56);
-      doc.text(dispatchLines[2] || '', 13, 59.5);
-      doc.text(dispatchLines[3] || '', 13, 63);
+      doc.text(String(po.id), 145, 26);
 
-      // Row 3: Supplier Header (Y = 66 to 71)
-      doc.setFillColor(239, 246, 255);
-      doc.rect(10, 66, 80, 5, 'FD');
       doc.setFont('helvetica', 'bold');
-      doc.text('Supplier TO:', 13, 69.5);
-
-      // Row 3: Supplier Body (spaced 3.2mm per line, Y=74 to Y=88)
-      doc.setFont('helvetica', 'bold');
-      doc.text(`M/S;   ${vendor?.name?.toUpperCase() || 'BHAGWATI STEEL AND ALLOYS PVT.LTD'}`, 13, 74.5);
+      doc.text('PO Date:', 118, 30);
       doc.setFont('helvetica', 'normal');
-      
-      const addr = vendor?.address || 'No. 15, Ponniamman Nagar Road, Chennai - 600095';
-      const addrLines = doc.splitTextToSize(addr, 74);
-      doc.text(addrLines[0] || '', 13, 78);
-      
-      doc.text(`MAIL:  ${vendor?.email || 'pradeepgs1@yahoo.com'}`, 13, 81.5);
-      doc.text(`GSTIN:  ${vendor?.gstin || '33AAGCB5988F1ZH'}`, 13, 85);
-      doc.text(`CONT:  ${vendor?.contact || 'ASHISH AGARWAL (9841160237)'}`, 13, 88.5);
-
-      // --- RIGHT PANEL (X: 90 to 200) ---
-      // Row 1 Divider
-      doc.line(90, 33, 200, 33);
-      doc.line(145, 20, 145, 33);
-
-      doc.setFontSize(9.5);
-      doc.setFont('helvetica', 'bold');
-      doc.text('PO.NO', 102, 28);
-      doc.text(String(po.id), 125, 28);
-
       let poDateFormatted = '—';
       if (po.date) {
-        try {
-          poDateFormatted = format(new Date(po.date), 'dd/MM/yyyy');
-        } catch (e) {
-          poDateFormatted = po.date;
-        }
+        try { poDateFormatted = format(new Date(po.date), 'dd/MM/yyyy'); }
+        catch (e) { poDateFormatted = po.date; }
       }
-      doc.text(poDateFormatted, 160, 28);
+      doc.text(poDateFormatted, 145, 30);
 
-      // Row 2: Buyer's Ref
-      doc.line(90, 38, 200, 38);
-      doc.setFontSize(8.5);
       doc.setFont('helvetica', 'bold');
-      doc.text("Buyer's Ref/Order No.", 93, 36.5);
-
-      doc.line(90, 45, 200, 45);
-      doc.line(145, 38, 145, 45);
+      doc.text("Buyer's Ref:", 118, 34);
       doc.setFont('helvetica', 'normal');
-      doc.text(po.reference || 'WHATSAPP', 105, 42.5);
-      doc.text(`DBTE - ${po.workOrderNo || '202'}`, 160, 42.5);
+      doc.text(po.reference || 'WHATSAPP', 145, 34);
 
-      // Row 3: Terms Header
       doc.setFont('helvetica', 'bold');
-      doc.text('Terms and Condition:-', 93, 49.5);
-
-      // Row 3: Terms Body (X values shifted to 135 to prevent squish)
-      doc.setFont('helvetica', 'bold');
-      doc.text('DELIVERY:', 93, 55);
+      doc.text('Work Order No:', 118, 38);
       doc.setFont('helvetica', 'normal');
-      
+      doc.text(po.workOrderNo ? `DBTE - ${po.workOrderNo}` : '—', 145, 38);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Project:', 118, 42);
+      doc.setFont('helvetica', 'normal');
+      doc.text(project?.name || '—', 145, 42);
+
+      // 3. Two-Column Vendor & Ship-To Details
+      // Vendor Box (Left, X=10 to 102)
+      doc.rect(10, 49, 92, 32, 'D');
+      doc.setFillColor(241, 245, 249);
+      doc.rect(10, 49, 92, 6, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.text('VENDOR / SUPPLIER DETAILS', 13, 53);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(vName.toUpperCase(), 13, 59);
+      doc.setFont('helvetica', 'normal');
+      const vAddrLines = doc.splitTextToSize(vAddress, 86);
+      let addrY = 63;
+      for (let i = 0; i < Math.min(vAddrLines.length, 3); i++) {
+        doc.text(vAddrLines[i], 13, addrY);
+        addrY += 3.5;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.text(`GSTIN: ${vGstin}`, 13, 74.5 >= addrY ? 74.5 : addrY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Contact: ${vContact} | Email: ${vEmail}`, 13, 78.5 >= addrY + 4 ? 78.5 : addrY + 4);
+
+      // Ship To Box (Right, X=108 to 200)
+      doc.rect(108, 49, 92, 32, 'D');
+      doc.setFillColor(241, 245, 249);
+      doc.rect(108, 49, 92, 6, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.text('SHIP TO / DISPATCH DETAILS', 111, 53);
+
+      doc.setFont('helvetica', 'bold');
+      const dispatchAddr = po.dispatchTo || 'DEEPIKA BUILTECH ENGINEERING\nSurvey No.44/5, Rajakulam Road,\nVaivayur Post, Karur Village, Kanchipuram - 631 561\nGSTIN: 33AEGPL3660M1ZC';
+      const dispatchLines = doc.splitTextToSize(dispatchAddr, 86);
+      doc.text(dispatchLines[0] || '', 111, 59);
+      doc.setFont('helvetica', 'normal');
+      let dispY = 63;
+      for (let i = 1; i < Math.min(dispatchLines.length, 6); i++) {
+        doc.text(dispatchLines[i], 111, dispY);
+        dispY += 3.5;
+      }
+
+      // 4. Terms and Conditions Box
+      doc.rect(10, 83, 190, 16, 'D');
+      doc.setFillColor(241, 245, 249);
+      doc.rect(10, 83, 190, 5, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.text('TERMS & CONDITIONS', 13, 86.5);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('DELIVERY DATE:', 13, 92);
+      doc.setFont('helvetica', 'normal');
       let deliveryText = po.deliveryTerms || 'Within a Days';
-      if (deliveryText && (
-        /^\d{4}-\d{2}-\d{2}$/.test(deliveryText) || /^\d{4}-\d{2}-\d{2}T/.test(deliveryText)
-      )) {
-        try {
-          deliveryText = format(new Date(deliveryText), 'dd-MM-yyyy');
-        } catch (e) {
-          // ignore
-        }
+      if (deliveryText && (/^\d{4}-\d{2}-\d{2}$/.test(deliveryText) || /^\d{4}-\d{2}-\d{2}T/.test(deliveryText))) {
+        try { deliveryText = format(new Date(deliveryText), 'dd-MM-yyyy'); } catch (e) {}
       }
-      doc.text(deliveryText, 135, 55);
+      doc.text(deliveryText, 45, 92);
 
       doc.setFont('helvetica', 'bold');
-      doc.text('TAX:', 93, 60);
+      doc.text('PAYMENT TERMS:', 110, 92);
       doc.setFont('helvetica', 'normal');
-      doc.text('EXTRA @ 18%', 135, 60);
+      doc.text(po.paymentTerms || '45 Days Credit', 145, 92);
 
       doc.setFont('helvetica', 'bold');
-      doc.text('TRANSPORT CHARGE:', 93, 65);
+      doc.text('INSTRUCTIONS:', 13, 96);
       doc.setFont('helvetica', 'normal');
-      doc.text('Extra @ Actual', 135, 65);
-
-      doc.setFont('helvetica', 'bold');
-      doc.text('FREIGHT & FORWARDING:', 93, 70);
-      doc.setFont('helvetica', 'normal');
-      doc.text('WEIGHING / LOADING CHARGES INCLUSIVE', 135, 70);
-
-      doc.setFont('helvetica', 'bold');
-      doc.text('PAYMENT TERMS:', 93, 75);
-      doc.setFont('helvetica', 'normal');
-      doc.text(po.paymentTerms || '45 Days Credit', 135, 75);
-
-      doc.line(90, 81, 200, 81);
-
-      // Row 4: Note
-      doc.setFont('helvetica', 'bold');
-      doc.text('NOTE:', 93, 86);
-      doc.setFont('helvetica', 'normal');
-      doc.text(po.remarks || '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED', 108, 86);
+      doc.text(po.remarks || 'ALONG WITH INVOICE, MIL TEST CERTIFICATE REQUIRED', 45, 96);
 
       // Calculate totals
       const subtotal = po.items.reduce((acc, i) => acc + (Number(i.rate) * Number(i.qty)), 0);
       const gstTotal = po.items.reduce((acc, i) => acc + Number(i.gstAmt), 0);
-      const grandTotal = subtotal + gstTotal;
+      const freight = Number(po.freightCharges) || 0;
+      const loading = Number(po.loadingCharges) || 0;
+      const unloading = Number(po.unloadingCharges) || 0;
+      const weighing = Number(po.weighingCharges) || 0;
+      const grandTotal = subtotal + gstTotal + freight + loading + unloading + weighing;
       const totalQty = po.items.reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
-      const mainUnit = po.items[0]?.unit || 'kgs';
+      const mainUnit = po.items[0]?.unit || 'Nos';
 
-      // 3. Items Table
+      // 5. Items Table
       const tableData = po.items.map((item, idx) => [
         idx + 1,
         item.itemName || '—',
@@ -220,16 +218,34 @@ export default function Vendors() {
         Number(item.total || 0).toFixed(2)
       ]);
 
+      const footRows = [
+        ['', '', '', '', 'Subtotal', `Rs. ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+        ['', '', '', '', 'GST Total', `Rs. ${gstTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+      ];
+      if (freight > 0) {
+        footRows.push(['', '', '', '', 'Freight Charges', `Rs. ${freight.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      }
+      if (loading > 0) {
+        footRows.push(['', '', '', '', 'Loading Charges', `Rs. ${loading.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      }
+      if (unloading > 0) {
+        footRows.push(['', '', '', '', 'Unloading Charges', `Rs. ${unloading.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      }
+      if (weighing > 0) {
+        footRows.push(['', '', '', '', 'Weighing Charges', `Rs. ${weighing.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      }
+      footRows.push(['', '', totalQty, mainUnit, 'GRAND TOTAL', `Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+
       const tableConfig = {
-        startY: 92,
+        startY: 102,
         theme: 'grid',
         head: [['SL. No.', 'Description Of Goods', 'QTY', 'UNIT', 'Rate', 'Total']],
         body: tableData,
-        foot: [['', '', totalQty, mainUnit, 'GRAND TOTAL', `Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]],
+        foot: footRows,
         styles: { lineColor: [0, 0, 0], lineWidth: 0.3 },
         headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9, lineWidth: 0.3, lineColor: [0, 0, 0] },
         bodyStyles: { textColor: [0, 0, 0], fontSize: 8.5 },
-        footStyles: { fillColor: [219, 234, 254], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9, lineWidth: 0.3, lineColor: [0, 0, 0] },
+        footStyles: { textColor: [0, 0, 0], fontSize: 9, lineWidth: 0.3, lineColor: [0, 0, 0] },
         columnStyles: {
           0: { cellWidth: 12, halign: 'center' },
           1: { cellWidth: 85, halign: 'left' },
@@ -237,6 +253,17 @@ export default function Vendors() {
           3: { cellWidth: 18, halign: 'center' },
           4: { cellWidth: 25, halign: 'right' },
           5: { cellWidth: 30, halign: 'right' }
+        },
+        didParseCell: function (data) {
+          if (data.section === 'foot') {
+            if (data.row.index === data.table.foot.length - 1) {
+              data.cell.styles.fillColor = [219, 234, 254];
+              data.cell.styles.fontStyle = 'bold';
+            } else {
+              data.cell.styles.fillColor = [255, 255, 255];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
         }
       };
 
@@ -253,7 +280,7 @@ export default function Vendors() {
 
       const finalY = (doc.lastAutoTable?.finalY || doc.previousAutoTable?.finalY || 180) + 6;
 
-      // 4. Amount in Words Box
+      // 6. Amount in Words Box
       doc.setFillColor(239, 246, 255); // Soft blue background
       doc.rect(10, finalY - 4, 190, 12, 'F');
       doc.setFontSize(8.5);
@@ -262,7 +289,7 @@ export default function Vendors() {
       doc.setFont('helvetica', 'bold');
       doc.text(numberToWords(grandTotal), 13, finalY + 5);
 
-      // 5. Signature / Footer Section
+      // 7. Signature / Footer Section
       const sigY = finalY + 22;
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'italic');
