@@ -347,31 +347,6 @@ export default function PurchaseOrders() {
         dispY += 3.5;
       }
 
-      // 4. Terms and Conditions Box
-      doc.rect(10, 83, 190, 16, 'D');
-      doc.setFillColor(241, 245, 249);
-      doc.rect(10, 83, 190, 5, 'FD');
-      doc.setFont('helvetica', 'bold');
-      doc.text('TERMS & CONDITIONS', 13, 86.5);
-
-      doc.setFont('helvetica', 'bold');
-      doc.text('DELIVERY DATE:', 13, 92);
-      doc.setFont('helvetica', 'normal');
-      let deliveryText = po.deliveryTerms || 'Within a Days';
-      if (deliveryText && (/^\d{4}-\d{2}-\d{2}$/.test(deliveryText) || /^\d{4}-\d{2}-\d{2}T/.test(deliveryText))) {
-        try { deliveryText = format(new Date(deliveryText), 'dd-MM-yyyy'); } catch (e) {}
-      }
-      doc.text(deliveryText, 45, 92);
-
-      doc.setFont('helvetica', 'bold');
-      doc.text('PAYMENT TERMS:', 110, 92);
-      doc.setFont('helvetica', 'normal');
-      doc.text(po.paymentTerms || '45 Days Credit', 145, 92);
-
-      doc.setFont('helvetica', 'bold');
-      doc.text('INSTRUCTIONS:', 13, 96);
-      doc.setFont('helvetica', 'normal');
-      doc.text(po.remarks || 'ALONG WITH INVOICE, MIL TEST CERTIFICATE REQUIRED', 45, 96);
 
       // Calculate totals
       const subtotal = po.items.reduce((acc, i) => acc + (Number(i.rate) * Number(i.qty)), 0);
@@ -413,7 +388,7 @@ export default function PurchaseOrders() {
       footRows.push(['', '', totalQty, mainUnit, 'GRAND TOTAL', `Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
 
       const tableConfig = {
-        startY: 102,
+        startY: 85,
         theme: 'grid',
         head: [['SL. No.', 'Description Of Goods', 'QTY', 'UNIT', 'Rate', 'Total']],
         body: tableData,
@@ -455,18 +430,64 @@ export default function PurchaseOrders() {
       }
 
       const finalY = (doc.lastAutoTable?.finalY || doc.previousAutoTable?.finalY || 180) + 6;
+      let currentY = finalY;
+
+      // Check if we need to add a page to fit the footer elements
+      // A4 page height is 297mm. If elements overflow, we add a page.
+      if (currentY + 56 > 280) {
+        doc.addPage();
+        currentY = 20; // start near top of new page
+      }
 
       // 6. Amount in Words Box
       doc.setFillColor(239, 246, 255); // Soft blue background
-      doc.rect(10, finalY - 4, 190, 12, 'F');
+      doc.rect(10, currentY - 4, 190, 12, 'F');
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'bold');
-      doc.text('AMOUNT IN WORDS:', 13, finalY);
-      doc.setFont('helvetica', 'bold');
-      doc.text(numberToWords(grandTotal), 13, finalY + 5);
+      doc.text('AMOUNT IN WORDS:', 13, currentY);
+      doc.text(numberToWords(grandTotal), 13, currentY + 5);
 
-      // 7. Signature / Footer Section
-      const sigY = finalY + 22;
+      currentY = currentY + 12; // move past Amount in Words box
+
+      // 7. Terms and Conditions Box
+      doc.rect(10, currentY, 190, 12, 'D');
+      doc.setFillColor(241, 245, 249);
+      doc.rect(10, currentY, 190, 5, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.text('TERMS & CONDITIONS', 13, currentY + 3.5);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('DELIVERY DATE:', 13, currentY + 9);
+      doc.setFont('helvetica', 'normal');
+      let deliveryText = po.deliveryTerms || 'Within a Days';
+      if (deliveryText && (/^\d{4}-\d{2}-\d{2}$/.test(deliveryText) || /^\d{4}-\d{2}-\d{2}T/.test(deliveryText))) {
+        try { deliveryText = format(new Date(deliveryText), 'dd-MM-yyyy'); } catch (e) {}
+      }
+      doc.text(deliveryText, 45, currentY + 9);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('PAYMENT TERMS:', 110, currentY + 9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(po.paymentTerms || '45 Days Credit', 145, currentY + 9);
+
+      currentY = currentY + 16; // 12 height + 4 spacing
+
+      // 8. Notes Box (under Terms and Conditions)
+      doc.rect(10, currentY, 190, 12, 'D');
+      doc.setFillColor(241, 245, 249);
+      doc.rect(10, currentY, 190, 5, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.text('NOTES / REMARKS', 13, currentY + 3.5);
+
+      doc.setFont('helvetica', 'normal');
+      doc.text(po.remarks || 'ALONG WITH INVOICE, MIL TEST CERTIFICATE REQUIRED', 13, currentY + 9);
+
+      currentY = currentY + 16; // 12 height + 4 spacing
+
+      // 9. Signature / Footer Section
+      const sigY = currentY + 2;
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'italic');
       doc.setTextColor(100, 100, 100);
