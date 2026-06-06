@@ -399,9 +399,27 @@ export default function Quotations() {
       let createdCount = 0;
       for (const [vendorId, items] of Object.entries(vendorItemsMap)) {
           if (items.length > 0) {
+             const vendor = vendors.find(v => v.id === vendorId);
+             const gstin = vendor?.gstin || '';
+             const cleanGstin = gstin.trim().replace(/[^0-9a-zA-Z]/g, '');
+             let taxType = 'Intra-State';
+             if (cleanGstin.length >= 2) {
+                const stateCode = cleanGstin.substring(0, 2);
+                if (stateCode !== '33') {
+                   taxType = 'Inter-State';
+                }
+             }
+
              const newPO = {
                 date: new Date().toISOString(),
                 vendorId: vendorId,
+                vendorName: vendor?.name || '',
+                vendorAddressLine1: vendor?.address || '',
+                vendorAddressLine2: '',
+                vendorCityPin: vendor?.city || '',
+                vendorContact: vendor?.contact || '',
+                vendorEmail: vendor?.email || '',
+                vendorGstin: gstin,
                 enquiryId: selectedEnquiryId,
                 projectId: enquiry.projectId,
                 workOrderNo: enquiry.workOrderNo,
@@ -413,7 +431,8 @@ export default function Quotations() {
                   gstAmt: (item.unitPrice * item.qty * item.gst / 100),
                   total: item.unitPrice * item.qty * (1 + item.gst / 100)
                 })),
-                status: 'Sent'
+                status: 'Sent',
+                taxType: taxType
              };
              await addPurchaseOrder(newPO);
              createdCount++;

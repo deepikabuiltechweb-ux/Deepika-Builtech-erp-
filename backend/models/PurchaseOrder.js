@@ -22,10 +22,11 @@ const purchaseOrderSchema = new mongoose.Schema({
   vendorGstin: { type: String },
   vendorContact: { type: String },
   vendorEmail: { type: String },
-  freightCharges: { type: Number, default: 0 },
+  freightCharges: { type: String, default: '0' },
   loadingCharges: { type: Number, default: 0 },
   unloadingCharges: { type: Number, default: 0 },
-  weighingCharges: { type: Number, default: 0 }
+  weighingCharges: { type: Number, default: 0 },
+  taxType: { type: String, default: 'Intra-State' }
 }, { timestamps: true });
 
 export default mongoose.model('PurchaseOrder', purchaseOrderSchema);

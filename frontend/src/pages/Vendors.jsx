@@ -15,6 +15,98 @@ function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
+// Format date from YYYY-MM-DD or ISO string to YYYY-MM-DD safely
+const formatDateString = (dateStr) => {
+  if (!dateStr) return '';
+  return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+};
+
+// Format date to DD-MM-YYYY format safely without timezone shift
+const displayDateFormatted = (dateStr) => {
+  if (!dateStr) return '';
+  const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
+};
+
+// Return charge value if it is non-zero and non-empty
+const displayCharges = (val) => {
+  if (!val || val === '0' || val === 0) return null;
+  return val;
+};
+
+// Determine transaction type dynamically
+const getPOTaxType = (po, vendor) => {
+  if (po && po.taxType) return po.taxType;
+  const gstin = po?.vendorGstin || vendor?.gstin || '';
+  const cleanGstin = gstin.trim().replace(/[^0-9a-zA-Z]/g, '');
+  if (cleanGstin.length >= 2) {
+    const stateCode = cleanGstin.substring(0, 2);
+    let dispatchStateCode = '33';
+    const dispatchGstinLine = (po?.dispatchTo || '').split('\n').find(l => l.toUpperCase().startsWith('GSTIN'));
+    if (dispatchGstinLine) {
+      const match = dispatchGstinLine.match(/GSTIN\s*:\s*([0-9]{2})/i);
+      if (match && match[1]) {
+        dispatchStateCode = match[1];
+      }
+    }
+    if (stateCode !== dispatchStateCode) {
+      return 'Inter-State';
+    }
+  }
+  return 'Intra-State';
+};
+
+// Group items by GST rate slabs and return taxes broken down
+const getTaxBreakdown = (items, taxType) => {
+  const breakdown = {};
+  (items || []).forEach(item => {
+    const rate = parseFloat(item.rate) || 0;
+    const qty = parseFloat(item.qty) || 0;
+    const gstRate = parseFloat(item.gst) || 0;
+    if (gstRate === 0) return;
+    
+    const base = rate * qty;
+    const gstAmt = parseFloat(((base * gstRate) / 100).toFixed(2));
+    
+    if (!breakdown[gstRate]) {
+      breakdown[gstRate] = { base: 0, gstAmt: 0 };
+    }
+    breakdown[gstRate].base += base;
+    breakdown[gstRate].gstAmt += gstAmt;
+  });
+  
+  const rows = [];
+  Object.keys(breakdown).sort((a, b) => Number(a) - Number(b)).forEach(rateStr => {
+    const rate = Number(rateStr);
+    const { gstAmt } = breakdown[rateStr];
+    if (taxType === 'Inter-State') {
+      rows.push({
+        label: `IGST @ ${rate}%`,
+        amount: gstAmt,
+        rate
+      });
+    } else {
+      const halfRate = rate / 2;
+      const halfAmt = parseFloat((gstAmt / 2).toFixed(2));
+      rows.push({
+        label: `CGST @ ${halfRate}%`,
+        amount: halfAmt,
+        rate: halfRate
+      });
+      rows.push({
+        label: `SGST @ ${halfRate}%`,
+        amount: halfAmt,
+        rate: halfRate
+      });
+    }
+  });
+  return rows;
+};
+
 export default function Vendors() {
   const { vendors, projects, purchaseOrders, addVendor, updateVendor, deleteVendor, canEdit, isAdmin } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -111,8 +203,7 @@ export default function Vendors() {
       doc.setFont('helvetica', 'normal');
       let poDateFormatted = '—';
       if (po.date) {
-        try { poDateFormatted = format(new Date(po.date), 'dd/MM/yyyy'); }
-        catch (e) { poDateFormatted = po.date; }
+        poDateFormatted = displayDateFormatted(po.date);
       }
       doc.text(poDateFormatted, 145, 30);
 
@@ -175,11 +266,16 @@ export default function Vendors() {
 
       // Calculate totals
       const subtotal = po.items.reduce((acc, i) => acc + (Number(i.rate) * Number(i.qty)), 0);
-      const gstTotal = po.items.reduce((acc, i) => acc + Number(i.gstAmt), 0);
       const freight = Number(po.freightCharges) || 0;
       const loading = Number(po.loadingCharges) || 0;
       const unloading = Number(po.unloadingCharges) || 0;
       const weighing = Number(po.weighingCharges) || 0;
+      
+      // Compute GST split totals
+      const taxType = po.taxType || getPOTaxType(po, vendor);
+      const taxBreakdown = getTaxBreakdown(po.items, taxType);
+      const gstTotal = taxBreakdown.reduce((sum, row) => sum + row.amount, 0);
+      
       const grandTotal = subtotal + gstTotal + freight + loading + unloading + weighing;
       const totalQty = po.items.reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
       const mainUnit = po.items[0]?.unit || 'Nos';
@@ -196,11 +292,21 @@ export default function Vendors() {
 
       const footRows = [
         ['', '', '', '', 'Subtotal', `Rs. ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-        ['', '', '', '', 'GST Total', `Rs. ${gstTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
       ];
-      if (freight > 0) {
-        footRows.push(['', '', '', '', 'Freight Charges', `Rs. ${freight.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      
+      // Push each split GST row
+      taxBreakdown.forEach(row => {
+        footRows.push(['', '', '', '', row.label, `Rs. ${row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      });
+      
+      // Push freight charges row
+      const hasFreight = po.freightCharges && po.freightCharges !== '0' && po.freightCharges !== 0;
+      if (hasFreight) {
+        const freightVal = Number(po.freightCharges);
+        const freightStr = !isNaN(freightVal) ? `Rs. ${freightVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : po.freightCharges;
+        footRows.push(['', '', '', '', 'Freight Charges', freightStr]);
       }
+      
       if (loading > 0) {
         footRows.push(['', '', '', '', 'Loading Charges', `Rs. ${loading.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
       }
@@ -285,9 +391,9 @@ export default function Vendors() {
       doc.setFont('helvetica', 'bold');
       doc.text('DELIVERY DATE:', 13, currentY + 9);
       doc.setFont('helvetica', 'normal');
-      let deliveryText = po.deliveryTerms || 'Within a Days';
-      if (deliveryText && (/^\d{4}-\d{2}-\d{2}$/.test(deliveryText) || /^\d{4}-\d{2}-\d{2}T/.test(deliveryText))) {
-        try { deliveryText = format(new Date(deliveryText), 'dd-MM-yyyy'); } catch (e) {}
+      let deliveryText = po.deliveryDate || po.deliveryTerms || 'Within a Days';
+      if (deliveryText && (/^\d{4}-\d{2}-\d{2}$/.test(deliveryText) || /^\d{4}-\d{2}-\d{2}T/.test(deliveryText) || /^\d{2}-\d{2}-\d{4}$/.test(deliveryText))) {
+        deliveryText = displayDateFormatted(deliveryText);
       }
       doc.text(deliveryText, 45, currentY + 9);
 
@@ -692,7 +798,7 @@ export default function Vendors() {
                           return (
                             <tr key={po.id || po._id}>
                               <td className="font-semibold text-primary">{po.id}</td>
-                              <td>{format(new Date(po.date), 'dd-MM-yyyy')}</td>
+                              <td>{displayDateFormatted(po.date)}</td>
                               <td className="text-right font-bold">₹{poTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                               <td>
                                 <span className={cn(

@@ -13,6 +13,17 @@ function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
+// Format date to DD-MM-YYYY format safely without timezone shift
+const displayDateFormatted = (dateStr) => {
+  if (!dateStr) return '';
+  const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
+};
+
 export default function StoreGRN() {
   const { grns, purchaseOrders, addGRN, deleteGRN, updateStockOnGRN, vendors, updatePurchaseOrder, isAdmin, projects } = useApp();
   const [showEntry, setShowEntry] = useState(false);
@@ -589,7 +600,7 @@ export default function StoreGRN() {
                   <p className="text-sm text-text-gray">Work Order No: {selectedPO.workOrderNo || '—'}</p>
                   {selectedPO.deliveryDate && (
                     <p className="text-sm text-text-gray">
-                      Expected Delivery: {format(new Date(selectedPO.deliveryDate), 'dd-MM-yyyy')}
+                      Expected Delivery: {displayDateFormatted(selectedPO.deliveryDate)}
                     </p>
                   )}
                 </div>

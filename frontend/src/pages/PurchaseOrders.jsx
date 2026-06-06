@@ -19,6 +19,98 @@ function cn(...inputs) {
 const UNITS = ['Nos', 'Kg', 'MT', 'Bag', 'Box', 'Pcs', 'Ltr', 'Mtr', 'Sqmt', 'Set', 'Pair'];
 const GST_RATES = [0, 5, 12, 18, 28];
 
+// Format date from YYYY-MM-DD or ISO string to YYYY-MM-DD safely
+const formatDateString = (dateStr) => {
+  if (!dateStr) return '';
+  return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+};
+
+// Format date to DD-MM-YYYY format safely without timezone shift
+const displayDateFormatted = (dateStr) => {
+  if (!dateStr) return '';
+  const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
+};
+
+// Return charge value if it is non-zero and non-empty
+const displayCharges = (val) => {
+  if (!val || val === '0' || val === 0) return null;
+  return val;
+};
+
+// Determine transaction type dynamically
+const getPOTaxType = (po, vendor) => {
+  if (po && po.taxType) return po.taxType;
+  const gstin = po?.vendorGstin || vendor?.gstin || '';
+  const cleanGstin = gstin.trim().replace(/[^0-9a-zA-Z]/g, '');
+  if (cleanGstin.length >= 2) {
+    const stateCode = cleanGstin.substring(0, 2);
+    let dispatchStateCode = '33';
+    const dispatchGstinLine = (po?.dispatchTo || '').split('\n').find(l => l.toUpperCase().startsWith('GSTIN'));
+    if (dispatchGstinLine) {
+      const match = dispatchGstinLine.match(/GSTIN\s*:\s*([0-9]{2})/i);
+      if (match && match[1]) {
+        dispatchStateCode = match[1];
+      }
+    }
+    if (stateCode !== dispatchStateCode) {
+      return 'Inter-State';
+    }
+  }
+  return 'Intra-State';
+};
+
+// Group items by GST rate slabs and return taxes broken down
+const getTaxBreakdown = (items, taxType) => {
+  const breakdown = {};
+  (items || []).forEach(item => {
+    const rate = parseFloat(item.rate) || 0;
+    const qty = parseFloat(item.qty) || 0;
+    const gstRate = parseFloat(item.gst) || 0;
+    if (gstRate === 0) return;
+    
+    const base = rate * qty;
+    const gstAmt = parseFloat(((base * gstRate) / 100).toFixed(2));
+    
+    if (!breakdown[gstRate]) {
+      breakdown[gstRate] = { base: 0, gstAmt: 0 };
+    }
+    breakdown[gstRate].base += base;
+    breakdown[gstRate].gstAmt += gstAmt;
+  });
+  
+  const rows = [];
+  Object.keys(breakdown).sort((a, b) => Number(a) - Number(b)).forEach(rateStr => {
+    const rate = Number(rateStr);
+    const { gstAmt } = breakdown[rateStr];
+    if (taxType === 'Inter-State') {
+      rows.push({
+        label: `IGST @ ${rate}%`,
+        amount: gstAmt,
+        rate
+      });
+    } else {
+      const halfRate = rate / 2;
+      const halfAmt = parseFloat((gstAmt / 2).toFixed(2));
+      rows.push({
+        label: `CGST @ ${halfRate}%`,
+        amount: halfAmt,
+        rate: halfRate
+      });
+      rows.push({
+        label: `SGST @ ${halfRate}%`,
+        amount: halfAmt,
+        rate: halfRate
+      });
+    }
+  });
+  return rows;
+};
+
 const emptyItem = () => ({
   itemCode: '',
   itemName: '',
@@ -107,7 +199,18 @@ export default function PurchaseOrders() {
   const applyDispatchAddress = (addr) => {
     const fields = parseDispatchString(addr);
     setDispatchFields(fields);
-    setForm(f => ({ ...f, dispatchTo: addr }));
+    
+    // Auto-detect tax type
+    const cleanVendorGstin = (form.vendorGstin || '').trim().replace(/[^0-9a-zA-Z]/g, '');
+    const cleanDispatchGstin = (fields.gstin || '').trim().replace(/[^0-9a-zA-Z]/g, '');
+    let newTaxType = form.taxType;
+    if (cleanVendorGstin.length >= 2 && cleanDispatchGstin.length >= 2) {
+      const vendorState = cleanVendorGstin.substring(0, 2);
+      const dispatchState = cleanDispatchGstin.substring(0, 2);
+      newTaxType = vendorState === dispatchState ? 'Intra-State' : 'Inter-State';
+    }
+    
+    setForm(f => ({ ...f, dispatchTo: addr, taxType: newTaxType }));
     setShowDispatchDropdown(false);
     setDispatchDropdownSearch('');
   };
@@ -115,7 +218,18 @@ export default function PurchaseOrders() {
   const handleDispatchFieldChange = (field, value) => {
     const updated = { ...dispatchFields, [field]: value };
     setDispatchFields(updated);
-    setForm(f => ({ ...f, dispatchTo: buildDispatchString(updated) }));
+    
+    let newTaxType = form.taxType;
+    if (field === 'gstin') {
+      const cleanVendorGstin = (form.vendorGstin || '').trim().replace(/[^0-9a-zA-Z]/g, '');
+      const cleanDispatchGstin = value.trim().replace(/[^0-9a-zA-Z]/g, '');
+      if (cleanVendorGstin.length >= 2 && cleanDispatchGstin.length >= 2) {
+        const vendorState = cleanVendorGstin.substring(0, 2);
+        const dispatchState = cleanDispatchGstin.substring(0, 2);
+        newTaxType = vendorState === dispatchState ? 'Intra-State' : 'Inter-State';
+      }
+    }
+    setForm(f => ({ ...f, dispatchTo: buildDispatchString(updated), taxType: newTaxType }));
   };
 
   const currentDispatchString = buildDispatchString(dispatchFields);
@@ -148,7 +262,7 @@ export default function PurchaseOrders() {
     vendorGstin: '',
     vendorContact: '',
     vendorEmail: '',
-    freightCharges: 0,
+    freightCharges: '',
     loadingCharges: 0,
     unloadingCharges: 0,
     weighingCharges: 0,
@@ -163,6 +277,7 @@ export default function PurchaseOrders() {
     paymentTerms: '45 Days Credit',
     remarks: '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
     reference: 'WHATSAPP',
+    taxType: 'Intra-State',
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -287,8 +402,7 @@ export default function PurchaseOrders() {
       doc.setFont('helvetica', 'normal');
       let poDateFormatted = '—';
       if (po.date) {
-        try { poDateFormatted = format(new Date(po.date), 'dd/MM/yyyy'); }
-        catch (e) { poDateFormatted = po.date; }
+        poDateFormatted = displayDateFormatted(po.date);
       }
       doc.text(poDateFormatted, 145, 30);
 
@@ -350,11 +464,16 @@ export default function PurchaseOrders() {
 
       // Calculate totals
       const subtotal = po.items.reduce((acc, i) => acc + (Number(i.rate) * Number(i.qty)), 0);
-      const gstTotal = po.items.reduce((acc, i) => acc + Number(i.gstAmt), 0);
       const freight = Number(po.freightCharges) || 0;
       const loading = Number(po.loadingCharges) || 0;
       const unloading = Number(po.unloadingCharges) || 0;
       const weighing = Number(po.weighingCharges) || 0;
+      
+      // Compute GST split totals
+      const taxType = po.taxType || getPOTaxType(po, vendor);
+      const taxBreakdown = getTaxBreakdown(po.items, taxType);
+      const gstTotal = taxBreakdown.reduce((sum, row) => sum + row.amount, 0);
+      
       const grandTotal = subtotal + gstTotal + freight + loading + unloading + weighing;
       const totalQty = po.items.reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
       const mainUnit = po.items[0]?.unit || 'Nos';
@@ -371,11 +490,21 @@ export default function PurchaseOrders() {
 
       const footRows = [
         ['', '', '', '', 'Subtotal', `Rs. ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-        ['', '', '', '', 'GST Total', `Rs. ${gstTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
       ];
-      if (freight > 0) {
-        footRows.push(['', '', '', '', 'Freight Charges', `Rs. ${freight.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      
+      // Push each split GST row
+      taxBreakdown.forEach(row => {
+        footRows.push(['', '', '', '', row.label, `Rs. ${row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      });
+      
+      // Push freight charges row
+      const hasFreight = po.freightCharges && po.freightCharges !== '0' && po.freightCharges !== 0;
+      if (hasFreight) {
+        const freightVal = Number(po.freightCharges);
+        const freightStr = !isNaN(freightVal) ? `Rs. ${freightVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : po.freightCharges;
+        footRows.push(['', '', '', '', 'Freight Charges', freightStr]);
       }
+      
       if (loading > 0) {
         footRows.push(['', '', '', '', 'Loading Charges', `Rs. ${loading.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
       }
@@ -460,9 +589,9 @@ export default function PurchaseOrders() {
       doc.setFont('helvetica', 'bold');
       doc.text('DELIVERY DATE:', 13, currentY + 9);
       doc.setFont('helvetica', 'normal');
-      let deliveryText = po.deliveryTerms || 'Within a Days';
-      if (deliveryText && (/^\d{4}-\d{2}-\d{2}$/.test(deliveryText) || /^\d{4}-\d{2}-\d{2}T/.test(deliveryText))) {
-        try { deliveryText = format(new Date(deliveryText), 'dd-MM-yyyy'); } catch (e) {}
+      let deliveryText = po.deliveryDate || po.deliveryTerms || 'Within a Days';
+      if (deliveryText && (/^\d{4}-\d{2}-\d{2}$/.test(deliveryText) || /^\d{4}-\d{2}-\d{2}T/.test(deliveryText) || /^\d{2}-\d{2}-\d{4}$/.test(deliveryText))) {
+        deliveryText = displayDateFormatted(deliveryText);
       }
       doc.text(deliveryText, 45, currentY + 9);
 
@@ -536,7 +665,7 @@ export default function PurchaseOrders() {
       vendorGstin: '',
       vendorContact: '',
       vendorEmail: '',
-      freightCharges: 0,
+      freightCharges: '',
       loadingCharges: 0,
       unloadingCharges: 0,
       weighingCharges: 0,
@@ -551,12 +680,14 @@ export default function PurchaseOrders() {
       paymentTerms: '45 Days Credit',
       remarks: '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
       reference: 'WHATSAPP',
+      taxType: 'Intra-State',
     });
   };
 
   const handleEditClick = (po) => {
     setEditingId(po.id || po._id);
     setIsManualVendor(!po.vendorId && !!po.vendorName);
+    const determinedTaxType = po.taxType || getPOTaxType(po, vendors.find(v => v.id === po.vendorId));
     setForm({
       vendorId: po.vendorId || '',
       vendorName: po.vendorName || '',
@@ -566,14 +697,14 @@ export default function PurchaseOrders() {
       vendorGstin: po.vendorGstin || '',
       vendorContact: po.vendorContact || '',
       vendorEmail: po.vendorEmail || '',
-      freightCharges: po.freightCharges || 0,
+      freightCharges: po.freightCharges !== undefined ? String(po.freightCharges) : '',
       loadingCharges: po.loadingCharges || 0,
       unloadingCharges: po.unloadingCharges || 0,
       weighingCharges: po.weighingCharges || 0,
       projectId: po.projectId || '',
       workOrderNo: po.workOrderNo || '',
-      date: po.date ? format(new Date(po.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-      deliveryDate: po.deliveryDate ? format(new Date(po.deliveryDate), 'yyyy-MM-dd') : '',
+      date: formatDateString(po.date) || format(new Date(), 'yyyy-MM-dd'),
+      deliveryDate: formatDateString(po.deliveryDate) || '',
       status: po.status || 'Sent',
       items: po.items && po.items.length > 0
         ? po.items.map(item => ({
@@ -588,14 +719,11 @@ export default function PurchaseOrders() {
         }))
         : [emptyItem()],
       dispatchTo: po.dispatchTo || buildDispatchString(defaultDispatchFields),
-      deliveryTerms: po.deliveryTerms ? (
-        /^\d{4}-\d{2}-\d{2}$/.test(po.deliveryTerms) || /^\d{4}-\d{2}-\d{2}T/.test(po.deliveryTerms)
-          ? format(new Date(po.deliveryTerms), 'yyyy-MM-dd')
-          : format(new Date(), 'yyyy-MM-dd')
-      ) : format(new Date(), 'yyyy-MM-dd'),
+      deliveryTerms: formatDateString(po.deliveryTerms) || format(new Date(), 'yyyy-MM-dd'),
       paymentTerms: po.paymentTerms || '45 Days Credit',
       remarks: po.remarks || '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
       reference: po.reference || 'WHATSAPP',
+      taxType: determinedTaxType,
     });
     setDispatchFields(parseDispatchString(po.dispatchTo || buildDispatchString(defaultDispatchFields)));
     setShowForm(true);
@@ -608,14 +736,21 @@ export default function PurchaseOrders() {
     if (form.items.some(it => !it.itemName.trim())) return toast.error('All items must have a name.');
     setSubmitting(true);
 
+    const payload = {
+      ...form,
+      date: new Date(form.date).toISOString(),
+      deliveryDate: form.deliveryDate ? new Date(form.deliveryDate).toISOString() : '',
+      deliveryTerms: form.deliveryTerms ? new Date(form.deliveryTerms).toISOString() : '',
+    };
+
     let result;
     if (editingId) {
-      result = await updatePurchaseOrder(editingId, { ...form, date: new Date(form.date).toISOString() });
+      result = await updatePurchaseOrder(editingId, payload);
       if (result) {
         toast.success('Purchase Order updated successfully!');
       }
     } else {
-      result = await addPurchaseOrder({ ...form, date: new Date(form.date).toISOString() });
+      result = await addPurchaseOrder(payload);
     }
 
     setSubmitting(false);
@@ -662,7 +797,7 @@ export default function PurchaseOrders() {
 
     const subject = encodeURIComponent(`Purchase Order ${po.id} – Deepika Builtech Engineering`);
     const body = encodeURIComponent(
-      `Dear ${vendor?.name || 'Vendor'},\n\nPlease find enclosed Purchase Order ${po.id} dated ${format(new Date(po.date), 'dd-MM-yyyy')}.\n\nKindly acknowledge receipt and confirm delivery schedule.\n\nRegards,\nDeepika Builtech Engineering`
+      `Dear ${vendor?.name || 'Vendor'},\n\nPlease find enclosed Purchase Order ${po.id} dated ${displayDateFormatted(po.date)}.\n\nKindly acknowledge receipt and confirm delivery schedule.\n\nRegards,\nDeepika Builtech Engineering`
     );
     window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
   };
@@ -671,8 +806,10 @@ export default function PurchaseOrders() {
     const vendor = vendors.find(v => v.id === selectedPO.vendorId);
     const project = projects.find(p => p.id === selectedPO.projectId);
     const subtotal = selectedPO.items.reduce((acc, i) => acc + (Number(i.rate) * Number(i.qty)), 0);
-    const gstTotal = selectedPO.items.reduce((acc, i) => acc + Number(i.gstAmt), 0);
     const charges = (Number(selectedPO.freightCharges) || 0) + (Number(selectedPO.loadingCharges) || 0) + (Number(selectedPO.unloadingCharges) || 0) + (Number(selectedPO.weighingCharges) || 0);
+    const determinedTaxType = selectedPO.taxType || getPOTaxType(selectedPO, vendor);
+    const taxBreakdown = getTaxBreakdown(selectedPO.items, determinedTaxType);
+    const gstTotal = taxBreakdown.reduce((sum, row) => sum + row.amount, 0);
     const grandTotal = subtotal + gstTotal + charges;
 
     return (
@@ -718,7 +855,7 @@ export default function PurchaseOrders() {
             <p className="text-sm text-text-gray">Buyer's Ref / Reference: {selectedPO.reference || 'WHATSAPP'}</p>
             {selectedPO.deliveryDate && (
               <p className="text-sm text-text-gray">
-                Expected Delivery: {format(new Date(selectedPO.deliveryDate), 'dd-MM-yyyy')}
+                Expected Delivery: {displayDateFormatted(selectedPO.deliveryDate)}
               </p>
             )}
           </div>
@@ -765,40 +902,44 @@ export default function PurchaseOrders() {
           <div className="w-full max-w-xs space-y-3 bg-white p-6 rounded-lg border border-border shadow-sm">
             <div className="flex justify-between text-sm">
               <span className="text-text-gray">Subtotal:</span>
-              <span className="font-semibold">₹{subtotal.toLocaleString()}</span>
+              <span className="font-semibold">₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-text-gray">GST Total:</span>
-              <span className="font-semibold">₹{gstTotal.toLocaleString()}</span>
-            </div>
-            {selectedPO.freightCharges > 0 && (
+            {taxBreakdown.map((row, rIdx) => (
+              <div key={rIdx} className="flex justify-between text-sm">
+                <span className="text-text-gray">{row.label}:</span>
+                <span className="font-semibold">₹{row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            ))}
+            {displayCharges(selectedPO.freightCharges) && (
               <div className="flex justify-between text-sm">
                 <span className="text-text-gray">Freight Charges:</span>
-                <span className="font-semibold">₹{selectedPO.freightCharges.toLocaleString()}</span>
+                <span className="font-semibold">
+                  {isNaN(Number(selectedPO.freightCharges)) ? selectedPO.freightCharges : `₹${Number(selectedPO.freightCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                </span>
               </div>
             )}
             {selectedPO.loadingCharges > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-text-gray">Loading Charges:</span>
-                <span className="font-semibold">₹{selectedPO.loadingCharges.toLocaleString()}</span>
+                <span className="font-semibold">₹{selectedPO.loadingCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
             )}
             {selectedPO.unloadingCharges > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-text-gray">Unloading Charges:</span>
-                <span className="font-semibold">₹{selectedPO.unloadingCharges.toLocaleString()}</span>
+                <span className="font-semibold">₹{selectedPO.unloadingCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
             )}
             {selectedPO.weighingCharges > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-text-gray">Weighing Charges:</span>
-                <span className="font-semibold">₹{selectedPO.weighingCharges.toLocaleString()}</span>
+                <span className="font-semibold">₹{selectedPO.weighingCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
             )}
             <div className="h-px bg-border" />
             <div className="flex justify-between text-lg font-bold text-primary">
               <span>Grand Total:</span>
-              <span>₹{grandTotal.toLocaleString()}</span>
+              <span>₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
           </div>
         </div>
@@ -809,19 +950,7 @@ export default function PurchaseOrders() {
             <div>
               <p className="text-text-gray text-xs uppercase tracking-wide">Delivery Date (Terms)</p>
               <p className="font-semibold text-text-dark mt-0.5">
-                {selectedPO.deliveryTerms && (
-                  /^\d{4}-\d{2}-\d{2}$/.test(selectedPO.deliveryTerms) || /^\d{4}-\d{2}-\d{2}T/.test(selectedPO.deliveryTerms)
-                ) ? (
-                  (() => {
-                    try {
-                      return format(new Date(selectedPO.deliveryTerms), 'dd-MM-yyyy');
-                    } catch (e) {
-                      return selectedPO.deliveryTerms;
-                    }
-                  })()
-                ) : (
-                  selectedPO.deliveryTerms || 'Within a Days'
-                )}
+                {selectedPO.deliveryTerms ? displayDateFormatted(selectedPO.deliveryTerms) : 'Within a Days'}
               </p>
             </div>
             <div>
@@ -885,10 +1014,10 @@ export default function PurchaseOrders() {
                 return (
                   <tr key={po.id}>
                     <td className="font-semibold text-primary">{po.id}</td>
-                    <td>{format(new Date(po.date), 'dd-MM-yyyy')}</td>
+                    <td>{displayDateFormatted(po.date)}</td>
                     <td className="font-medium">{po.vendorName || vendors.find(v => v.id === po.vendorId)?.name || '—'}</td>
                     <td>{projects.find(p => p.id === po.projectId)?.name}</td>
-                    <td className="text-right font-bold">₹{total.toLocaleString()}</td>
+                    <td className="text-right font-bold">₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     <td>
                       <span className={cn(
                         'badge',
@@ -1020,6 +1149,19 @@ export default function PurchaseOrders() {
                       onSelect={(v) => {
                         const selected = vendors.find(vend => vend.id === v.id);
                         const addrParsed = parseAddressString(selected?.address);
+                        const gstin = selected?.gstin || '33AAGCB5988F1ZH';
+                        const cleanGstin = gstin.trim().replace(/[^0-9a-zA-Z]/g, '');
+                        let newTaxType = 'Intra-State';
+                        if (cleanGstin.length >= 2) {
+                          const stateCode = cleanGstin.substring(0, 2);
+                          let dispatchStateCode = '33';
+                          if (dispatchFields.gstin && dispatchFields.gstin.length >= 2) {
+                            dispatchStateCode = dispatchFields.gstin.substring(0, 2);
+                          }
+                          if (stateCode !== dispatchStateCode) {
+                            newTaxType = 'Inter-State';
+                          }
+                        }
                         setForm(f => ({
                           ...f,
                           vendorId: v.id,
@@ -1027,9 +1169,10 @@ export default function PurchaseOrders() {
                           vendorAddressLine1: addrParsed.addrLine1 || '',
                           vendorAddressLine2: addrParsed.addrLine2 || '',
                           vendorCityPin: addrParsed.cityPin || selected?.city || '',
-                          vendorGstin: selected?.gstin || '33AAGCB5988F1ZH',
+                          vendorGstin: gstin,
                           vendorContact: selected?.contact || '',
-                          vendorEmail: selected?.email || ''
+                          vendorEmail: selected?.email || '',
+                          taxType: newTaxType
                         }));
                       }}
                       placeholder="Search/Select Vendor..."
@@ -1092,6 +1235,17 @@ export default function PurchaseOrders() {
                   </select>
                 </div>
                 <div className="space-y-1">
+                  <label className="text-sm font-medium text-text-dark">GST Transaction Type</label>
+                  <select
+                    className="input-field w-full font-semibold"
+                    value={form.taxType || 'Intra-State'}
+                    onChange={e => setForm(f => ({ ...f, taxType: e.target.value }))}
+                  >
+                    <option value="Intra-State">Intra-State (CGST + SGST)</option>
+                    <option value="Inter-State">Inter-State (IGST)</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
                   <label className="text-sm font-medium text-text-dark">Buyer's Ref / Reference</label>
                   <input
                     className="input-field w-full"
@@ -1127,7 +1281,26 @@ export default function PurchaseOrders() {
                           type="text"
                           placeholder={placeholder}
                           value={form[key] || ''}
-                          onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                          onChange={e => {
+                            const val = e.target.value;
+                            if (key === 'vendorGstin') {
+                              const cleanGstin = val.trim().replace(/[^0-9a-zA-Z]/g, '');
+                              let newTaxType = 'Intra-State';
+                              if (cleanGstin.length >= 2) {
+                                const stateCode = cleanGstin.substring(0, 2);
+                                let dispatchStateCode = '33';
+                                if (dispatchFields.gstin && dispatchFields.gstin.length >= 2) {
+                                  dispatchStateCode = dispatchFields.gstin.substring(0, 2);
+                                }
+                                if (stateCode !== dispatchStateCode) {
+                                  newTaxType = 'Inter-State';
+                                }
+                              }
+                              setForm(f => ({ ...f, vendorGstin: val, taxType: newTaxType }));
+                            } else {
+                              setForm(f => ({ ...f, [key]: val }));
+                            }
+                          }}
                         />
                       </div>
                     ))}
@@ -1278,15 +1451,13 @@ export default function PurchaseOrders() {
                   <h4 className="text-xs font-bold uppercase tracking-wider text-primary mb-3">Price & Charges (Manual Entry)</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="space-y-1">
-                      <label className="text-sm font-medium text-text-dark">Freight Charges (₹)</label>
+                      <label className="text-sm font-medium text-text-dark">Freight Charges</label>
                       <input
                         className="input-field w-full text-right"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={form.freightCharges || ''}
-                        onChange={e => setForm(f => ({ ...f, freightCharges: parseFloat(e.target.value) || 0 }))}
+                        type="text"
+                        placeholder="e.g. 0.00 or Extra"
+                        value={form.freightCharges}
+                        onChange={e => setForm(f => ({ ...f, freightCharges: e.target.value }))}
                       />
                     </div>
                     <div className="space-y-1">
@@ -1453,40 +1624,44 @@ export default function PurchaseOrders() {
                 <div className="w-80 space-y-2 bg-primary/5 p-4 rounded-xl border border-primary/20">
                   <div className="flex justify-between text-sm">
                     <span className="text-text-gray">Subtotal:</span>
-                    <span className="font-semibold">₹{formSubtotal.toLocaleString()}</span>
+                    <span className="font-semibold">₹{formSubtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-text-gray">GST Total:</span>
-                    <span className="font-semibold">₹{formGST.toFixed(2)}</span>
-                  </div>
-                  {form.freightCharges > 0 && (
+                  {getTaxBreakdown(form.items, form.taxType).map((row, rIdx) => (
+                    <div key={rIdx} className="flex justify-between text-sm animate-in fade-in duration-200">
+                      <span className="text-text-gray">{row.label}:</span>
+                      <span className="font-semibold">₹{row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  ))}
+                  {displayCharges(form.freightCharges) && (
                     <div className="flex justify-between text-sm">
                       <span className="text-text-gray">Freight Charges:</span>
-                      <span className="font-semibold">₹{form.freightCharges.toFixed(2)}</span>
+                      <span className="font-semibold">
+                        {isNaN(Number(form.freightCharges)) ? form.freightCharges : `₹${parseFloat(form.freightCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                      </span>
                     </div>
                   )}
                   {form.loadingCharges > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-text-gray">Loading Charges:</span>
-                      <span className="font-semibold">₹{form.loadingCharges.toFixed(2)}</span>
+                      <span className="font-semibold">₹{parseFloat(form.loadingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
                   {form.unloadingCharges > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-text-gray">Unloading Charges:</span>
-                      <span className="font-semibold">₹{form.unloadingCharges.toFixed(2)}</span>
+                      <span className="font-semibold">₹{parseFloat(form.unloadingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
                   {form.weighingCharges > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-text-gray">Weighing Charges:</span>
-                      <span className="font-semibold">₹{form.weighingCharges.toFixed(2)}</span>
+                      <span className="font-semibold">₹{parseFloat(form.weighingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
                   <div className="h-px bg-primary/20" />
                   <div className="flex justify-between font-bold text-primary text-lg">
                     <span>Grand Total:</span>
-                    <span>₹{formGrand.toFixed(2)}</span>
+                    <span>₹{formGrand.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               </div>
