@@ -422,8 +422,8 @@ export default function PurchaseOrders() {
       doc.text(project?.name || '—', 145, 42);
 
       // 3. Two-Column Vendor & Ship-To Details
-      // Vendor Box (Left, X=10 to 102)
-      doc.rect(10, 49, 92, 32, 'D');
+      // Vendor Box (Left, X=10 to 102) — height 40 to fit all content
+      doc.rect(10, 49, 92, 40, 'D');
       doc.setFillColor(241, 245, 249);
       doc.rect(10, 49, 92, 6, 'FD');
       doc.setFont('helvetica', 'bold');
@@ -434,17 +434,22 @@ export default function PurchaseOrders() {
       doc.setFont('helvetica', 'normal');
       const vAddrLines = doc.splitTextToSize(vAddress, 86);
       let addrY = 63;
-      for (let i = 0; i < Math.min(vAddrLines.length, 3); i++) {
+      for (let i = 0; i < Math.min(vAddrLines.length, 4); i++) {
         doc.text(vAddrLines[i], 13, addrY);
         addrY += 3.5;
       }
+      // Always place GSTIN and Contact within box (max Y = 84)
+      const gstY = Math.max(addrY + 1, 70);
+      const contactY = gstY + 4.5;
       doc.setFont('helvetica', 'bold');
-      doc.text(`GSTIN: ${vGstin}`, 13, 74.5 >= addrY ? 74.5 : addrY);
+      doc.text(`GSTIN: ${vGstin}`, 13, gstY);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Contact: ${vContact} | Email: ${vEmail}`, 13, 78.5 >= addrY + 4 ? 78.5 : addrY + 4);
+      const contactStr = `Contact: ${vContact} | Email: ${vEmail}`;
+      const contactLines = doc.splitTextToSize(contactStr, 86);
+      contactLines.slice(0, 2).forEach((line, i) => doc.text(line, 13, contactY + i * 3.5));
 
-      // Ship To Box (Right, X=108 to 200)
-      doc.rect(108, 49, 92, 32, 'D');
+      // Ship To Box (Right, X=108 to 200) — height 40 to match vendor box
+      doc.rect(108, 49, 92, 40, 'D');
       doc.setFillColor(241, 245, 249);
       doc.rect(108, 49, 92, 6, 'FD');
       doc.setFont('helvetica', 'bold');
@@ -456,7 +461,7 @@ export default function PurchaseOrders() {
       doc.text(dispatchLines[0] || '', 111, 59);
       doc.setFont('helvetica', 'normal');
       let dispY = 63;
-      for (let i = 1; i < Math.min(dispatchLines.length, 6); i++) {
+      for (let i = 1; i < Math.min(dispatchLines.length, 7); i++) {
         doc.text(dispatchLines[i], 111, dispY);
         dispY += 3.5;
       }
@@ -517,21 +522,23 @@ export default function PurchaseOrders() {
       footRows.push(['', '', totalQty, mainUnit, 'GRAND TOTAL', `Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
 
       const tableConfig = {
-        startY: 85,
+        startY: 93,
+        margin: { left: 10, right: 10 },
+        tableWidth: 190,
         theme: 'grid',
         head: [['SL. No.', 'Description Of Goods', 'QTY', 'UNIT', 'Rate', 'Total']],
         body: tableData,
         foot: footRows,
-        styles: { lineColor: [0, 0, 0], lineWidth: 0.3 },
+        styles: { lineColor: [0, 0, 0], lineWidth: 0.3, overflow: 'linebreak' },
         headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9, lineWidth: 0.3, lineColor: [0, 0, 0] },
         bodyStyles: { textColor: [0, 0, 0], fontSize: 8.5 },
         footStyles: { textColor: [0, 0, 0], fontSize: 9, lineWidth: 0.3, lineColor: [0, 0, 0] },
         columnStyles: {
           0: { cellWidth: 12, halign: 'center' },
-          1: { cellWidth: 85, halign: 'left' },
-          2: { cellWidth: 20, halign: 'center' },
+          1: { cellWidth: 80, halign: 'left' },
+          2: { cellWidth: 22, halign: 'center' },
           3: { cellWidth: 18, halign: 'center' },
-          4: { cellWidth: 25, halign: 'right' },
+          4: { cellWidth: 28, halign: 'right' },
           5: { cellWidth: 30, halign: 'right' }
         },
         didParseCell: function (data) {
