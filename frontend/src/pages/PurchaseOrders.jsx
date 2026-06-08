@@ -263,9 +263,9 @@ export default function PurchaseOrders() {
     vendorContact: '',
     vendorEmail: '',
     freightCharges: '',
-    loadingCharges: 0,
-    unloadingCharges: 0,
-    weighingCharges: 0,
+    loadingCharges: '',
+    unloadingCharges: '',
+    weighingCharges: '',
     projectId: '',
     workOrderNo: '',
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -666,9 +666,9 @@ export default function PurchaseOrders() {
       vendorContact: '',
       vendorEmail: '',
       freightCharges: '',
-      loadingCharges: 0,
-      unloadingCharges: 0,
-      weighingCharges: 0,
+      loadingCharges: '',
+      unloadingCharges: '',
+      weighingCharges: '',
       projectId: '',
       workOrderNo: '',
       date: format(new Date(), 'yyyy-MM-dd'),
@@ -698,9 +698,9 @@ export default function PurchaseOrders() {
       vendorContact: po.vendorContact || '',
       vendorEmail: po.vendorEmail || '',
       freightCharges: po.freightCharges !== undefined ? String(po.freightCharges) : '',
-      loadingCharges: po.loadingCharges || 0,
-      unloadingCharges: po.unloadingCharges || 0,
-      weighingCharges: po.weighingCharges || 0,
+      loadingCharges: po.loadingCharges !== undefined ? String(po.loadingCharges) : '',
+      unloadingCharges: po.unloadingCharges !== undefined ? String(po.unloadingCharges) : '',
+      weighingCharges: po.weighingCharges !== undefined ? String(po.weighingCharges) : '',
       projectId: po.projectId || '',
       workOrderNo: po.workOrderNo || '',
       date: formatDateString(po.date) || format(new Date(), 'yyyy-MM-dd'),
@@ -1464,36 +1464,30 @@ export default function PurchaseOrders() {
                       <label className="text-sm font-medium text-text-dark">Loading Charges (₹)</label>
                       <input
                         className="input-field w-full text-right"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={form.loadingCharges || ''}
-                        onChange={e => setForm(f => ({ ...f, loadingCharges: parseFloat(e.target.value) || 0 }))}
+                        type="text"
+                        placeholder="e.g. 0.00 or Extra"
+                        value={form.loadingCharges}
+                        onChange={e => setForm(f => ({ ...f, loadingCharges: e.target.value }))}
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-text-dark">Unloading Charges (₹)</label>
                       <input
                         className="input-field w-full text-right"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={form.unloadingCharges || ''}
-                        onChange={e => setForm(f => ({ ...f, unloadingCharges: parseFloat(e.target.value) || 0 }))}
+                        type="text"
+                        placeholder="e.g. 0.00 or Extra"
+                        value={form.unloadingCharges}
+                        onChange={e => setForm(f => ({ ...f, unloadingCharges: e.target.value }))}
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-text-dark">Weighing Charges (₹)</label>
                       <input
                         className="input-field w-full text-right"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={form.weighingCharges || ''}
-                        onChange={e => setForm(f => ({ ...f, weighingCharges: parseFloat(e.target.value) || 0 }))}
+                        type="text"
+                        placeholder="e.g. 0.00 or Extra"
+                        value={form.weighingCharges}
+                        onChange={e => setForm(f => ({ ...f, weighingCharges: e.target.value }))}
                       />
                     </div>
                   </div>
