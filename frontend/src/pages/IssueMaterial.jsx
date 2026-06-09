@@ -14,9 +14,10 @@ function cn(...inputs) {
 }
 
 export default function IssueMaterial() {
-  const { materials, projects, issues, addIssue, deleteIssue, deductStockOnIssue, isAdmin, addProject, purchaseOrders } = useApp();
+  const { materials, projects, issues, addIssue, deleteIssue, deductStockOnIssue, isAdmin, addProject } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // ─── PDF Generator ────────────────────────────────────────────────────────
   const generatePDF = (issue) => {
@@ -75,6 +76,7 @@ export default function IssueMaterial() {
     // Items Table
     const tableData = issue.items.map((item, idx) => [
       idx + 1,
+      item.materialId || '—',
       item.name,
       item.qty,
       item.unit || 'Nos',
@@ -84,15 +86,16 @@ export default function IssueMaterial() {
 
     const tableConfig = {
       startY: 104,
-      head: [['#', 'Material Description', 'Quantity', 'Unit', 'LPR Rate', 'Total Cost']],
+      head: [['#', 'Item Code', 'Material Description', 'Quantity', 'Unit', 'LPR Rate', 'Total Cost']],
       body: tableData,
       headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9 },
       bodyStyles: { fontSize: 9 },
       columnStyles: {
         0: { cellWidth: 8 },
-        2: { halign: 'right', cellWidth: 24 },
-        4: { halign: 'right', cellWidth: 32 },
-        5: { halign: 'right', cellWidth: 32 }
+        1: { cellWidth: 22 },
+        3: { halign: 'right', cellWidth: 20 },
+        5: { halign: 'right', cellWidth: 28 },
+        6: { halign: 'right', cellWidth: 28 }
       },
       alternateRowStyles: { fillColor: [245, 247, 255] },
     };
@@ -148,13 +151,6 @@ export default function IssueMaterial() {
     }
   };
 
-  const handlePOSelect = (poId) => {
-    const po = purchaseOrders.find(p => p.id === poId);
-    if (po) {
-      setFormData({ ...formData, workOrderNo: po.id, projectId: po.projectId });
-    }
-  };
-
   const handleItemSelect = (index, material) => {
     const newItems = [...formData.items];
     newItems[index] = {
@@ -177,37 +173,58 @@ export default function IssueMaterial() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate Purchase Order
-    if (!purchaseOrders.find(po => po.id === formData.workOrderNo)) {
-      toast.error("You must select a valid, existing Purchase Order!");
+
+    // ── Guard: prevent double-click duplicate submissions ──
+    if (submitting) return;
+
+    if (!formData.projectId) {
+      toast.error("Please select a Project!");
       return;
     }
 
-    // Check stock availability
-    const outOfStock = formData.items.find(item => item.qty > item.available);
-    if (outOfStock) {
-      toast.error(`Insufficient stock for ${outOfStock.name}!`);
+    const hasInvalidItem = formData.items.some(item => !item.materialId);
+    if (hasInvalidItem) {
+      toast.error("Please select a valid material for all items!");
       return;
     }
 
-    const newIssue = {
-      ...formData,
-      totalCost: formData.items.reduce((acc, i) => acc + (i.qty * i.rate), 0)
-    };
+    if (formData.items.some(item => item.qty <= 0)) {
+      toast.error("Issue quantity must be greater than zero for all items!");
+      return;
+    }
 
-    const success = await addIssue(newIssue);
-    if (success) {
-      await deductStockOnIssue(formData.items);
-      setShowForm(false);
-      setFormData({
-        issueDate: format(new Date(), 'yyyy-MM-dd'),
-        projectId: '',
-        workOrderNo: '',
-        issuedTo: '',
-        purpose: '',
-        items: [{ id: Date.now(), materialId: '', name: '', qty: 0, available: 0, unit: '', rate: 0 }]
-      });
+    // ── Re-validate stock from live materials state (catches stale data) ──
+    for (const item of formData.items) {
+      const liveMaterial = materials.find(m => m.id === item.materialId);
+      const liveStock = liveMaterial ? liveMaterial.currentStock : item.available;
+      if (item.qty > liveStock) {
+        toast.error(`Insufficient stock for "${item.name}"! Available: ${liveStock} ${item.unit}`);
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      const newIssue = {
+        ...formData,
+        totalCost: formData.items.reduce((acc, i) => acc + (i.qty * i.rate), 0)
+      };
+
+      const success = await addIssue(newIssue);
+      if (success) {
+        await deductStockOnIssue(formData.items);
+        setShowForm(false);
+        setFormData({
+          issueDate: format(new Date(), 'yyyy-MM-dd'),
+          projectId: '',
+          workOrderNo: '',
+          issuedTo: '',
+          purpose: '',
+          items: [{ id: Date.now(), materialId: '', name: '', qty: 0, available: 0, unit: '', rate: 0 }]
+        });
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -227,7 +244,7 @@ export default function IssueMaterial() {
 
       {showForm ? (
         <form onSubmit={handleSubmit} className="space-y-6 animate-in slide-in-from-top-4 duration-300">
-           <div className="card grid grid-cols-1 md:grid-cols-4 gap-4">
+           <div className="card grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                  <label className="block text-sm font-medium text-text-gray mb-1">Issue Date</label>
                  <input type="date" className="input-field" value={formData.issueDate} onChange={e => setFormData({...formData, issueDate: e.target.value})} />
@@ -249,15 +266,6 @@ export default function IssueMaterial() {
                  <label className="block text-sm font-medium text-text-gray mb-1">Issued To</label>
                  <input type="text" className="input-field" placeholder="Employee Name" value={formData.issuedTo} onChange={e => setFormData({...formData, issuedTo: e.target.value})} />
               </div>
-              <div>
-                 <label className="block text-sm font-medium text-text-gray mb-1">Purchase Order</label>
-                 <Autocomplete
-                    options={purchaseOrders.map(po => ({ ...po, name: po.id }))}
-                    onSelect={(po) => handlePOSelect(po.id)}
-                    placeholder="Select existing PO..."
-                    value={formData.workOrderNo}
-                 />
-              </div>
            </div>
 
            <div className="card overflow-hidden">
@@ -267,6 +275,7 @@ export default function IssueMaterial() {
               <table className="erp-table">
                  <thead>
                     <tr>
+                       <th>Item Code</th>
                        <th className="w-1/3">Item Name (Autocomplete)</th>
                        <th className="text-right">Available Stock</th>
                        <th className="text-right">Issue Qty</th>
@@ -280,10 +289,13 @@ export default function IssueMaterial() {
                     {formData.items.map((item, index) => (
                       <tr key={item.id}>
                          <td>
+                            <span className="font-mono text-xs text-text-gray">{item.materialId || '—'}</span>
+                         </td>
+                         <td>
                             <Autocomplete 
                                options={materials}
                                onSelect={(mat) => handleItemSelect(index, mat)}
-                               placeholder="Search stock..."
+                               placeholder="Search by name or item code..."
                                value={item.materialId}
                             />
                          </td>
@@ -336,7 +348,13 @@ export default function IssueMaterial() {
                  <p className="text-3xl font-bold text-primary">₹{formData.items.reduce((acc, i) => acc + (i.qty * i.rate), 0).toLocaleString()}</p>
                  <div className="flex gap-3 mt-4">
                     <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2 border border-border rounded-md">Cancel</button>
-                    <button type="submit" className="btn-primary px-8">Confirm Issue</button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className={`btn-primary px-8 ${submitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      {submitting ? 'Processing…' : 'Confirm Issue'}
+                    </button>
                  </div>
               </div>
            </div>
@@ -435,6 +453,7 @@ export default function IssueMaterial() {
                   <thead className="bg-primary/10 text-primary">
                     <tr>
                       <th className="px-4 py-2 text-left">#</th>
+                      <th className="px-4 py-2 text-left">Item Code</th>
                       <th className="px-4 py-2 text-left">Material</th>
                       <th className="px-4 py-2 text-right">Qty</th>
                       <th className="px-4 py-2 text-left">Unit</th>
@@ -446,6 +465,7 @@ export default function IssueMaterial() {
                     {selectedIssue.items.map((item, idx) => (
                       <tr key={idx} className="border-t border-border hover:bg-gray-50">
                         <td className="px-4 py-2 text-text-gray">{idx + 1}</td>
+                        <td className="px-4 py-2 font-mono text-xs">{item.materialId || '—'}</td>
                         <td className="px-4 py-2 font-medium">{item.name}</td>
                         <td className="px-4 py-2 text-right font-bold text-primary">{item.qty}</td>
                         <td className="px-4 py-2 text-text-gray">{item.unit}</td>
@@ -456,7 +476,7 @@ export default function IssueMaterial() {
                   </tbody>
                   <tfoot className="bg-primary-bg">
                     <tr>
-                      <td colSpan="5" className="px-4 py-3 text-right font-bold text-text-dark">Grand Total:</td>
+                      <td colSpan="6" className="px-4 py-3 text-right font-bold text-text-dark">Grand Total:</td>
                       <td className="px-4 py-3 text-right font-bold text-primary text-lg">₹{Number(selectedIssue.totalCost).toLocaleString()}</td>
                     </tr>
                   </tfoot>

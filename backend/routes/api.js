@@ -132,8 +132,19 @@ router.post('/grn', protect, authorize('superadmin', 'admin', 'manager', 'staff'
          { id: item.materialId },
          { 
            $inc: { currentStock: item.receivedQty },
-           $set: { latestPrice: item.unitPrice } 
-         }
+           $set: { 
+             latestPrice: item.unitPrice,
+             name: item.name
+           },
+           $setOnInsert: {
+             category: 'General',
+             unit: item.unit || 'Nos',
+             brand: '—',
+             lastPrice: item.unitPrice,
+             minLevel: 0
+           }
+         },
+         { upsert: true, new: true }
        );
     }
     await clearCache(`/api/v1/materials`);
@@ -143,10 +154,29 @@ router.post('/grn', protect, authorize('superadmin', 'admin', 'manager', 'staff'
 // Material Issue Stock Deduction
 router.post('/issue', protect, authorize('superadmin', 'admin', 'manager', 'staff', 'store_team'), asyncHandler(async (req, res) => {
     const { items } = req.body;
+
+    // ── Server-side stock validation before deducting anything ──
+    for (const item of items) {
+      const mat = await Material.findOne({ id: item.materialId }).lean();
+      if (!mat) {
+        res.status(404);
+        throw new Error(`Material "${item.materialId}" not found`);
+      }
+      if (mat.currentStock < item.qty) {
+        res.status(400);
+        throw new Error(
+          `Insufficient stock for "${mat.name}" (${item.materialId}). ` +
+          `Available: ${mat.currentStock}, Requested: ${item.qty}`
+        );
+      }
+    }
+
+    // All items passed validation — now deduct atomically
     for (const item of items) {
        await Material.findOneAndUpdate(
          { id: item.materialId },
-         { 
+         {
+           // $max ensures stock never goes below 0 as a safety net
            $inc: { currentStock: -item.qty }
          }
        );

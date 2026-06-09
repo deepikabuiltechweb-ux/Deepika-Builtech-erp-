@@ -25,7 +25,7 @@ const displayDateFormatted = (dateStr) => {
 };
 
 export default function StoreGRN() {
-  const { grns, purchaseOrders, addGRN, deleteGRN, updateStockOnGRN, vendors, updatePurchaseOrder, isAdmin, projects } = useApp();
+  const { grns, purchaseOrders, addGRN, deleteGRN, updateStockOnGRN, vendors, updatePurchaseOrder, isAdmin, projects, materials } = useApp();
   const [showEntry, setShowEntry] = useState(false);
   const [selectedGRN, setSelectedGRN] = useState(null);
   const [selectedPO, setSelectedPO] = useState(null);
@@ -105,7 +105,9 @@ export default function StoreGRN() {
       // Items Table
       const tableData = (grn.items || []).map((item, idx) => [
         idx + 1,
+        item.materialId || '—',
         item.name || '—',
+        item.unitPrice ? `Rs. ${Number(item.unitPrice).toLocaleString()}` : '—',
         item.poQty || 0,
         item.receivedQty || 0,
         item.rejectedQty || 0,
@@ -115,16 +117,18 @@ export default function StoreGRN() {
 
       const tableConfig = {
         startY: 104,
-        head: [['#', 'Material Description', 'PO Qty', 'Received Qty', 'Rejected Qty', 'Quality Status', 'Remarks / Damages']],
+        head: [['#', 'Item Code', 'Material Description', 'Price', 'PO Qty', 'Received Qty', 'Rejected Qty', 'Quality Status', 'Remarks / Damages']],
         body: tableData,
         headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9 },
         bodyStyles: { fontSize: 9 },
         columnStyles: {
           0: { cellWidth: 8 },
-          2: { halign: 'right', cellWidth: 18 },
-          3: { halign: 'right', cellWidth: 24 },
-          4: { halign: 'right', cellWidth: 24 },
-          5: { halign: 'center', cellWidth: 24 }
+          1: { cellWidth: 20 },
+          3: { halign: 'right', cellWidth: 20 },
+          4: { halign: 'right', cellWidth: 18 },
+          5: { halign: 'right', cellWidth: 22 },
+          6: { halign: 'right', cellWidth: 22 },
+          7: { halign: 'center', cellWidth: 20 }
         },
         alternateRowStyles: { fillColor: [245, 247, 255] },
       };
@@ -175,6 +179,7 @@ export default function StoreGRN() {
   const [formData, setFormData] = useState({
     grnDate: format(new Date(), 'yyyy-MM-dd'),
     poRef: '',
+    vendorId: '',
     vehicleNo: '',
     driverName: '',
     dcNo: '',
@@ -189,28 +194,93 @@ export default function StoreGRN() {
       setFormData({
         ...formData,
         poRef: poId,
+        vendorId: po.vendorId,
         items: po.items.map(item => ({
-          materialId: item.materialId,
+          materialId: item.materialId || item.itemCode || '',
           name: item.itemName,
           poQty: item.qty,
           receivedQty: item.qty,
           rejectedQty: 0,
           damageRemarks: '',
           qualityOk: true,
-          unitPrice: item.rate
+          unitPrice: item.rate,
+          fromPO: true,
+          unit: item.unit || 'Nos'
         }))
+      });
+    } else {
+      setFormData({
+        ...formData,
+        poRef: '',
+        vendorId: '',
+        items: []
       });
     }
   };
 
+  const handleAddItem = () => {
+    setFormData({
+      ...formData,
+      items: [
+        ...formData.items,
+        {
+          id: Date.now(),
+          materialId: '',
+          name: '',
+          poQty: 0,
+          receivedQty: 0,
+          rejectedQty: 0,
+          damageRemarks: '',
+          qualityOk: true,
+          unitPrice: 0,
+          fromPO: false,
+          unit: 'Nos'
+        }
+      ]
+    });
+  };
+
+  const handleItemSelect = (index, material) => {
+    const newItems = [...formData.items];
+    newItems[index] = {
+      ...newItems[index],
+      materialId: material.id,
+      name: material.name,
+      unitPrice: material.latestPrice || material.lastPrice || 0,
+      unit: material.unit || 'Nos'
+    };
+    setFormData({ ...formData, items: newItems });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.poRef && !formData.vendorId) {
+      toast.error("Please select a Vendor or a Purchase Order Reference!");
+      return;
+    }
+
+    if (formData.items.length === 0) {
+      toast.error("Please add at least one item!");
+      return;
+    }
+
+    // Check if any item lacks a materialId
+    const hasInvalidItem = formData.items.some(item => !item.materialId);
+    if (hasInvalidItem) {
+      toast.error("Please select a valid material for all items!");
+      return;
+    }
+
     const po = purchaseOrders.find(p => p.id === formData.poRef);
-    const vendorId = po?.vendorId || '';
-    const vendorName = po?.vendorName || vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor';
+    const vendorId = formData.poRef ? (po?.vendorId || '') : formData.vendorId;
+    const vendorName = formData.poRef
+      ? (po?.vendorName || vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor')
+      : (vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor');
+
     const newGRN = {
       ...formData,
-      poId: formData.poRef,
+      poId: formData.poRef || '',
       vendorId,
       vendorName,
       invoiceNo: formData.dcNo
@@ -221,13 +291,16 @@ export default function StoreGRN() {
       // Update stock using business logic in context
       await updateStockOnGRN(formData.items);
 
-      // Update PO status
-      await updatePurchaseOrder(formData.poRef, { status: 'Complete' });
+      // Update PO status if there is a PO
+      if (formData.poRef) {
+        await updatePurchaseOrder(formData.poRef, { status: 'Complete' });
+      }
 
       setShowEntry(false);
       setFormData({
         grnDate: format(new Date(), 'yyyy-MM-dd'),
         poRef: '',
+        vendorId: '',
         vehicleNo: '',
         driverName: '',
         dcNo: '',
@@ -254,7 +327,7 @@ export default function StoreGRN() {
 
       {showEntry ? (
         <form onSubmit={handleSubmit} className="space-y-6 animate-in slide-in-from-top-4 duration-300">
-           <div className="card grid grid-cols-1 md:grid-cols-4 gap-4">
+           <div className="card grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
                 <label className="block text-sm font-medium text-text-gray mb-1">PO Reference</label>
                 <Autocomplete
@@ -279,6 +352,24 @@ export default function StoreGRN() {
                 )}
               </div>
               <div>
+                <label className="block text-sm font-medium text-text-gray mb-1">Vendor</label>
+                {formData.poRef ? (
+                  <input
+                    type="text"
+                    className="input-field bg-gray-100 cursor-not-allowed text-text-gray"
+                    value={vendors.find(v => v.id === formData.vendorId)?.name || 'Unknown Vendor'}
+                    disabled
+                  />
+                ) : (
+                  <Autocomplete
+                    options={vendors}
+                    onSelect={(vendor) => setFormData({ ...formData, vendorId: vendor.id })}
+                    placeholder="Search Vendor..."
+                    value={formData.vendorId}
+                  />
+                )}
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-text-gray mb-1">GRN Date</label>
                 <input type="date" className="input-field" value={formData.grnDate} onChange={e => setFormData({...formData, grnDate: e.target.value})} />
               </div>
@@ -292,28 +383,51 @@ export default function StoreGRN() {
               </div>
            </div>
 
-           {formData.items.length > 0 && (
-             <div className="card overflow-hidden">
-                <div className="p-4 bg-primary-dark text-white font-semibold flex items-center gap-2">
-                   <Package className="w-5 h-5" /> Material Verification
-                </div>
-                <table className="erp-table">
-                   <thead>
+           <div className="card overflow-hidden">
+              <div className="p-4 bg-primary-dark text-white font-semibold flex items-center gap-2">
+                 <Package className="w-5 h-5" /> Material Verification
+              </div>
+              <table className="erp-table">
+                 <thead>
+                    <tr>
+                       <th className="w-1/3">Item Description</th>
+                       <th>Item Code</th>
+                       <th className="text-right">PO Qty</th>
+                       <th className="text-right">Received Qty</th>
+                       <th className="text-right">Rejected Qty</th>
+                       <th className="text-right">Unit Price (₹)</th>
+                       <th>Damage Remarks</th>
+                       <th className="text-center">Quality OK</th>
+                       <th className="w-12"></th>
+                    </tr>
+                 </thead>
+                 <tbody>
+                    {formData.items.length === 0 ? (
                       <tr>
-                         <th>Item</th>
-                         <th className="text-right">PO Qty</th>
-                         <th className="text-right">Received Qty</th>
-                         <th className="text-right">Rejected Qty</th>
-                         <th>Damage Remarks</th>
-                         <th className="text-center">Quality OK</th>
+                        <td colSpan="9" className="text-center p-8 text-text-gray italic">
+                          No items added yet. Click "Add Item" below to add materials manually.
+                        </td>
                       </tr>
-                   </thead>
-                   <tbody>
-                      {formData.items.map((item, index) => (
-                        <tr key={index}>
-                           <td className="font-medium">{item.name}</td>
-                           <td className="text-right">{item.poQty}</td>
-                           <td className="p-2 w-32">
+                    ) : (
+                      formData.items.map((item, index) => (
+                        <tr key={item.id || index}>
+                           <td>
+                              {item.fromPO && item.materialId ? (
+                                <span className="font-medium text-text-dark">{item.name}</span>
+                              ) : (
+                                <Autocomplete 
+                                   options={materials}
+                                   onSelect={(mat) => handleItemSelect(index, mat)}
+                                   placeholder="Search material..."
+                                   value={item.materialId}
+                                />
+                              )}
+                           </td>
+                           <td>
+                              <span className="font-mono text-xs text-text-gray">{item.materialId || '—'}</span>
+                           </td>
+                           <td className="text-right font-medium text-text-gray">{item.fromPO ? item.poQty : '—'}</td>
+                           <td className="p-2 w-28">
                               <input 
                                 type="number" 
                                 className="input-field text-right" 
@@ -325,7 +439,7 @@ export default function StoreGRN() {
                                 }}
                               />
                            </td>
-                           <td className="p-2 w-32">
+                           <td className="p-2 w-28">
                               <input 
                                 type="number" 
                                 className="input-field text-right" 
@@ -333,6 +447,19 @@ export default function StoreGRN() {
                                 onChange={(e) => {
                                   const newItems = [...formData.items];
                                   newItems[index].rejectedQty = Number(e.target.value);
+                                  setFormData({...formData, items: newItems});
+                                }}
+                              />
+                           </td>
+                           <td className="p-2 w-28">
+                              <input 
+                                type="number" 
+                                step="0.01"
+                                className="input-field text-right" 
+                                value={item.unitPrice}
+                                onChange={(e) => {
+                                  const newItems = [...formData.items];
+                                  newItems[index].unitPrice = Number(e.target.value);
                                   setFormData({...formData, items: newItems});
                                 }}
                               />
@@ -353,7 +480,7 @@ export default function StoreGRN() {
                            <td className="text-center">
                               <input 
                                 type="checkbox" 
-                                className="w-5 h-5"
+                                className="w-5 h-5 mx-auto"
                                 checked={item.qualityOk}
                                 onChange={(e) => {
                                   const newItems = [...formData.items];
@@ -362,12 +489,29 @@ export default function StoreGRN() {
                                 }}
                               />
                            </td>
+                           <td>
+                              <button 
+                                 type="button" 
+                                 onClick={() => {
+                                   const newItems = formData.items.filter((_, idx) => idx !== index);
+                                   setFormData({...formData, items: newItems});
+                                 }}
+                                 className="p-1 text-error hover:bg-error/10 rounded"
+                              >
+                                 <Trash2 className="w-4 h-4" />
+                              </button>
+                           </td>
                         </tr>
-                      ))}
-                   </tbody>
-                </table>
-             </div>
-           )}
+                      ))
+                    )}
+                 </tbody>
+              </table>
+              <div className="p-4 bg-gray-50 border-t border-border">
+                 <button type="button" onClick={handleAddItem} className="text-sm font-bold text-primary hover:underline flex items-center gap-1">
+                    <Plus className="w-4 h-4" /> Add Item
+                 </button>
+              </div>
+           </div>
 
            <div className="card grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -531,7 +675,9 @@ export default function StoreGRN() {
                   <thead className="bg-primary/10 text-primary">
                     <tr>
                       <th className="px-4 py-2 text-left">#</th>
-                      <th className="px-4 py-2 text-left">Item</th>
+                      <th className="px-4 py-2 text-left">Item Code</th>
+                      <th className="px-4 py-2 text-left">Item Description</th>
+                      <th className="px-4 py-2 text-right">Unit Price</th>
                       <th className="px-4 py-2 text-right">PO Qty</th>
                       <th className="px-4 py-2 text-right">Received</th>
                       <th className="px-4 py-2 text-right">Rejected</th>
@@ -543,8 +689,10 @@ export default function StoreGRN() {
                     {selectedGRN.items.map((item, idx) => (
                       <tr key={idx} className="border-t border-border hover:bg-gray-50">
                         <td className="px-4 py-2 text-text-gray">{idx + 1}</td>
+                        <td className="px-4 py-2 font-mono text-xs">{item.materialId || '—'}</td>
                         <td className="px-4 py-2 font-medium">{item.name}</td>
-                        <td className="px-4 py-2 text-right">{item.poQty}</td>
+                        <td className="px-4 py-2 text-right font-semibold">₹{Number(item.unitPrice || 0).toLocaleString()}</td>
+                        <td className="px-4 py-2 text-right">{item.poQty !== undefined && item.poQty !== null ? item.poQty : '—'}</td>
                         <td className="px-4 py-2 text-right font-bold text-primary">{item.receivedQty}</td>
                         <td className="px-4 py-2 text-right text-error">{item.rejectedQty || 0}</td>
                         <td className="px-4 py-2 text-center">
