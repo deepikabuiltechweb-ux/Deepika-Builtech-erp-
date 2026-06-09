@@ -412,13 +412,18 @@ export default function StoreGRN() {
                       formData.items.map((item, index) => (
                         <tr key={item.id || index}>
                            <td>
-                              {item.fromPO && item.materialId ? (
-                                <span className="font-medium text-text-dark">{item.name}</span>
+                              {item.fromPO && item.name ? (
+                                <div>
+                                  <span className="font-medium text-text-dark block">{item.name}</span>
+                                  {item.materialId && (
+                                    <span className="text-xs text-text-gray font-mono">{item.materialId}</span>
+                                  )}
+                                </div>
                               ) : (
                                 <Autocomplete 
                                    options={materials}
                                    onSelect={(mat) => handleItemSelect(index, mat)}
-                                   placeholder="Search material..."
+                                   placeholder="Search by name or item code..."
                                    value={item.materialId}
                                 />
                               )}
