@@ -317,9 +317,42 @@ export default function StoreGRN() {
       // Update stock using business logic in context
       await updateStockOnGRN(formData.items);
 
-      // Update PO status if there is a PO
+      // Update PO status dynamically if there is a PO reference
       if (formData.poRef) {
-        await updatePurchaseOrder(formData.poRef, { status: 'Complete' });
+        const po = purchaseOrders.find(p => p.id === formData.poRef);
+        if (po) {
+          const receivedMap = {};
+          
+          // Current GRN items
+          formData.items.forEach(item => {
+            const key = item.materialId || item.itemCode;
+            if (key) {
+              receivedMap[key] = (receivedMap[key] || 0) + (Number(item.receivedQty) || 0);
+            }
+          });
+
+          // Past GRNs for this PO
+          grns.forEach(grn => {
+            if (grn.poRef === po.id || grn.poId === po.id) {
+              grn.items.forEach(item => {
+                const key = item.materialId || item.itemCode;
+                if (key) {
+                  receivedMap[key] = (receivedMap[key] || 0) + (Number(item.receivedQty) || 0);
+                }
+              });
+            }
+          });
+
+          // Check if all PO items are fully received
+          const isFullyReceived = po.items.every(poItem => {
+            const key = poItem.materialId || poItem.itemCode;
+            const cumulativeReceived = receivedMap[key] || 0;
+            return cumulativeReceived >= poItem.qty;
+          });
+
+          const status = isFullyReceived ? 'Complete' : 'Partial';
+          await updatePurchaseOrder(formData.poRef, { status });
+        }
       }
 
       setShowEntry(false);
@@ -438,12 +471,10 @@ export default function StoreGRN() {
                       formData.items.map((item, index) => (
                         <tr key={item.id || index}>
                            <td>
-                              {item.fromPO && item.name ? (
+                              {item.fromPO && item.name && item.materialId ? (
                                 <div>
                                   <span className="font-medium text-text-dark block">{item.name}</span>
-                                  {item.materialId && (
-                                    <span className="text-xs text-text-gray font-mono">{item.materialId}</span>
-                                  )}
+                                  <span className="text-xs text-text-gray font-mono">{item.materialId}</span>
                                 </div>
                               ) : (
                                 <Autocomplete 
