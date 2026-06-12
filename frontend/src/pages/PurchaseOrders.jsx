@@ -707,10 +707,10 @@ export default function PurchaseOrders() {
       vendorGstin: po.vendorGstin || vendor?.gstin || '',
       vendorContact: po.vendorContact || vendor?.contact || '',
       vendorEmail: po.vendorEmail || vendor?.email || '',
-      freightCharges: po.freightCharges !== undefined ? String(po.freightCharges) : '',
-      loadingCharges: po.loadingCharges !== undefined ? String(po.loadingCharges) : '',
-      unloadingCharges: po.unloadingCharges !== undefined ? String(po.unloadingCharges) : '',
-      weighingCharges: po.weighingCharges !== undefined ? String(po.weighingCharges) : '',
+      freightCharges: po.freightCharges !== undefined && po.freightCharges !== null ? String(po.freightCharges) : '',
+      loadingCharges: po.loadingCharges !== undefined && po.loadingCharges !== null ? String(po.loadingCharges) : '',
+      unloadingCharges: po.unloadingCharges !== undefined && po.unloadingCharges !== null ? String(po.unloadingCharges) : '',
+      weighingCharges: po.weighingCharges !== undefined && po.weighingCharges !== null ? String(po.weighingCharges) : '',
       projectId: po.projectId || '',
       workOrderNo: po.workOrderNo || '',
       date: formatDateString(po.date) || format(new Date(), 'yyyy-MM-dd'),
@@ -751,6 +751,9 @@ export default function PurchaseOrders() {
       date: new Date(form.date).toISOString(),
       deliveryDate: form.deliveryDate ? new Date(form.deliveryDate).toISOString() : '',
       deliveryTerms: form.deliveryTerms ? new Date(form.deliveryTerms).toISOString() : '',
+      loadingCharges: Number(form.loadingCharges) || 0,
+      unloadingCharges: Number(form.unloadingCharges) || 0,
+      weighingCharges: Number(form.weighingCharges) || 0,
     };
 
     let result;
