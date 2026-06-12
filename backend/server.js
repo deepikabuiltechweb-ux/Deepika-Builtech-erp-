@@ -57,9 +57,10 @@ const allowedOrigins = frontendUrl ? [frontendUrl] : ['http://localhost:5173', '
 
 app.use(cors({
   origin: function (origin, callback) {
+    console.log("CORS request origin:", origin);
     const originSafe = origin ? origin.replace(/\/$/, '') : '';
     if (!origin || allowedOrigins.includes(originSafe) || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
+      callback(null, origin || '*');
     } else {
       callback(new Error('Not allowed by CORS'));
     }

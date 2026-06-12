@@ -490,7 +490,7 @@ export default function PurchaseOrders() {
         item.qty || 0,
         item.unit || 'Nos',
         Number(item.rate || 0).toFixed(2),
-        Number(item.total || 0).toFixed(2)
+        (Number(item.rate || 0) * Number(item.qty || 0)).toFixed(2)
       ]);
 
       const footRows = [
@@ -694,16 +694,19 @@ export default function PurchaseOrders() {
   const handleEditClick = (po) => {
     setEditingId(po.id || po._id);
     setIsManualVendor(!po.vendorId && !!po.vendorName);
-    const determinedTaxType = po.taxType || getPOTaxType(po, vendors.find(v => v.id === po.vendorId));
+    const vendor = vendors.find(v => v.id === po.vendorId);
+    const determinedTaxType = po.taxType || getPOTaxType(po, vendor);
+    const vendorAddrParsed = vendor?.address ? parseAddressString(vendor.address) : { addrLine1: '', addrLine2: '', cityPin: '' };
+    
     setForm({
       vendorId: po.vendorId || '',
-      vendorName: po.vendorName || '',
-      vendorAddressLine1: po.vendorAddressLine1 || '',
-      vendorAddressLine2: po.vendorAddressLine2 || '',
-      vendorCityPin: po.vendorCityPin || '',
-      vendorGstin: po.vendorGstin || '',
-      vendorContact: po.vendorContact || '',
-      vendorEmail: po.vendorEmail || '',
+      vendorName: po.vendorName || vendor?.name || '',
+      vendorAddressLine1: po.vendorAddressLine1 || vendorAddrParsed.addrLine1 || '',
+      vendorAddressLine2: po.vendorAddressLine2 || vendorAddrParsed.addrLine2 || '',
+      vendorCityPin: po.vendorCityPin || vendorAddrParsed.cityPin || vendor?.city || '',
+      vendorGstin: po.vendorGstin || vendor?.gstin || '',
+      vendorContact: po.vendorContact || vendor?.contact || '',
+      vendorEmail: po.vendorEmail || vendor?.email || '',
       freightCharges: po.freightCharges !== undefined ? String(po.freightCharges) : '',
       loadingCharges: po.loadingCharges !== undefined ? String(po.loadingCharges) : '',
       unloadingCharges: po.unloadingCharges !== undefined ? String(po.unloadingCharges) : '',
@@ -717,12 +720,12 @@ export default function PurchaseOrders() {
         ? po.items.map(item => ({
           itemCode: item.itemCode || '',
           itemName: item.itemName || '',
-          qty: item.qty || 1,
+          qty: item.qty !== undefined ? Number(item.qty) : 1,
           unit: item.unit || 'Nos',
-          rate: item.rate || 0,
-          gst: item.gst || 18,
-          gstAmt: item.gstAmt || 0,
-          total: item.total || 0,
+          rate: item.rate !== undefined ? Number(item.rate) : 0,
+          gst: item.gst !== undefined ? Number(item.gst) : 18,
+          gstAmt: item.gstAmt !== undefined ? Number(item.gstAmt) : 0,
+          total: item.total !== undefined ? Number(item.total) : 0,
         }))
         : [emptyItem()],
       dispatchTo: po.dispatchTo || buildDispatchString(defaultDispatchFields),

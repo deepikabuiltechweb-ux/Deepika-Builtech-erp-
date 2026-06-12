@@ -287,7 +287,7 @@ export default function Vendors() {
         item.qty || 0,
         item.unit || 'Nos',
         Number(item.rate || 0).toFixed(2),
-        Number(item.total || 0).toFixed(2)
+        (Number(item.rate || 0) * Number(item.qty || 0)).toFixed(2)
       ]);
 
       const footRows = [
