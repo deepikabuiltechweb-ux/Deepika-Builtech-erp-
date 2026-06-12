@@ -698,6 +698,9 @@ export default function PurchaseOrders() {
     const determinedTaxType = po.taxType || getPOTaxType(po, vendor);
     const vendorAddrParsed = vendor?.address ? parseAddressString(vendor.address) : { addrLine1: '', addrLine2: '', cityPin: '' };
     
+    const parsedDispatch = parseDispatchString(po.dispatchTo || buildDispatchString(defaultDispatchFields));
+    const cleanedDispatchTo = buildDispatchString(parsedDispatch);
+
     setForm({
       vendorId: po.vendorId || '',
       vendorName: po.vendorName || vendor?.name || '',
@@ -728,14 +731,14 @@ export default function PurchaseOrders() {
           total: item.total !== undefined ? Number(item.total) : 0,
         }))
         : [emptyItem()],
-      dispatchTo: po.dispatchTo || buildDispatchString(defaultDispatchFields),
+      dispatchTo: cleanedDispatchTo,
       deliveryTerms: formatDateString(po.deliveryTerms) || format(new Date(), 'yyyy-MM-dd'),
       paymentTerms: po.paymentTerms || '45 Days Credit',
       remarks: po.remarks || '* ALONG WITH INVOICE , MIL TEST CERTIFICATE REQUIRED',
       reference: po.reference || 'WHATSAPP',
       taxType: determinedTaxType,
     });
-    setDispatchFields(parseDispatchString(po.dispatchTo || buildDispatchString(defaultDispatchFields)));
+    setDispatchFields(parsedDispatch);
     setShowForm(true);
   };
 
