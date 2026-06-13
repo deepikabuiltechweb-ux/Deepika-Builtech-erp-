@@ -76,7 +76,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
       roles: ['admin', 'staff', 'purchase_team', 'store_team'] 
     },
     { path: '/quotations', label: 'Quotations', icon: FileText, roles: ['admin', 'staff', 'purchase_team'] },
-    { path: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, roles: ['admin', 'staff', 'purchase_team'] },
+    { path: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, roles: ['admin', 'staff', 'purchase_team', 'store_team'] },
     { path: '/store', label: 'Store / GRN', icon: Warehouse, roles: ['admin', 'staff', 'store_team'] },
     { path: '/emergency-dc', label: 'Delivery Challan', icon: ClipboardList, roles: ['admin', 'staff', 'store_team'] },
     { path: '/issue', label: 'Issue Material', icon: ArrowUpRight, roles: ['admin', 'staff', 'store_team'] },
