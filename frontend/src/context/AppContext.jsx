@@ -522,7 +522,7 @@ export const AppProvider = ({ children }) => {
       if (!existing) return;
       const dbId = existing._id || existing.id;
       await axios.delete(`${API_BASE_URL}/purchaseorders/${dbId}`);
-      setPurchaseOrders(prev => prev.filter(p => p.id !== id && p._id !== id));
+      await fetchData();
       toast.success("Purchase Order deleted successfully");
       return true;
     } catch (e) {

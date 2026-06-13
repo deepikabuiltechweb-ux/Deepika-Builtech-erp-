@@ -96,6 +96,58 @@ const createCRUD = (model, name) => {
   }));
 };
 
+// Custom DELETE for purchaseorders to handle sequential renumbering of remaining POs
+router.delete('/purchaseorders/:id', protect, authorize('superadmin', 'admin'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  
+  // Find the PO to delete
+  let toDelete = await PurchaseOrder.findOne({ id });
+  if (!toDelete && mongoose.Types.ObjectId.isValid(id)) {
+    toDelete = await PurchaseOrder.findById(id);
+  }
+  
+  if (!toDelete) {
+    res.status(404);
+    throw new Error('Purchase Order not found');
+  }
+  
+  // Delete the PO
+  await PurchaseOrder.deleteOne({ _id: toDelete._id });
+  
+  // Fetch all remaining POs
+  const remainingPOs = await PurchaseOrder.find();
+  
+  // Sort them by their original numerical ID suffix
+  remainingPOs.sort((a, b) => {
+    const numA = parseInt(a.id?.replace(/\D/g, '') || 0);
+    const numB = parseInt(b.id?.replace(/\D/g, '') || 0);
+    return numA - numB;
+  });
+  
+  // Renumber them starting from 23
+  let currentNum = 23;
+  for (const po of remainingPOs) {
+    const newId = `PO-${String(currentNum).padStart(3, '0')}`;
+    const oldId = po.id;
+    
+    if (oldId !== newId) {
+      // Update the PO itself
+      await PurchaseOrder.updateOne({ _id: po._id }, { $set: { id: newId } });
+      
+      // Update any referencing GRNs
+      await GRN.updateMany({ poId: oldId }, { $set: { poId: newId } });
+      await GRN.updateMany({ poRef: oldId }, { $set: { poRef: newId } });
+    }
+    currentNum++;
+  }
+  
+  // Invalidate cache
+  await clearCache('/api/v1/purchaseorders');
+  await clearCache('/api/v1/grns');
+  
+  res.status(200).json(new ApiResponse(200, null, 'Deleted and renumbered remaining purchase orders successfully'));
+}));
+
 createCRUD(Material, 'materials');
 createCRUD(Project, 'projects');
 createCRUD(Vendor, 'vendors');
