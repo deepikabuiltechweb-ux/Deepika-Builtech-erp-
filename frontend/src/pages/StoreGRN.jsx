@@ -137,24 +137,26 @@ export default function StoreGRN() {
         item.poQty || 0,
         item.receivedQty || 0,
         item.rejectedQty || 0,
+        item.fromPO ? (item.keepPending === false ? 'NO' : 'YES') : '—',
         item.qualityOk ? 'PASSED' : 'FAILED',
         item.damageRemarks || '—'
       ]);
 
       const tableConfig = {
         startY: 104,
-        head: [['#', 'Item Code', 'Material Description', 'Price', 'PO Qty', 'Received Qty', 'Rejected Qty', 'Quality Status', 'Remarks / Damages']],
+        head: [['#', 'Item Code', 'Material Description', 'Price', 'PO Qty', 'Received Qty', 'Rejected Qty', 'Pending?', 'Quality Status', 'Remarks / Damages']],
         body: tableData,
         headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9 },
         bodyStyles: { fontSize: 9 },
         columnStyles: {
           0: { cellWidth: 8 },
-          1: { cellWidth: 20 },
-          3: { halign: 'right', cellWidth: 20 },
-          4: { halign: 'right', cellWidth: 18 },
-          5: { halign: 'right', cellWidth: 22 },
-          6: { halign: 'right', cellWidth: 22 },
-          7: { halign: 'center', cellWidth: 20 }
+          1: { cellWidth: 18 },
+          3: { halign: 'right', cellWidth: 18 },
+          4: { halign: 'right', cellWidth: 15 },
+          5: { halign: 'right', cellWidth: 20 },
+          6: { halign: 'right', cellWidth: 20 },
+          7: { halign: 'center', cellWidth: 15 },
+          8: { halign: 'center', cellWidth: 18 }
         },
         alternateRowStyles: { fillColor: [245, 247, 255] },
       };
@@ -244,11 +246,20 @@ export default function StoreGRN() {
         vendorId: po.vendorId,
         items: po.items.map((item, idx) => {
           const key = getPOItemKey(item, idx, materials);
+          const pastGrnsForItem = poGrns.filter(g => g.items?.some(gi => (gi.materialId || gi.itemCode) === key));
+          
+          // Check if any past GRN marked this item as closed (keepPending === false)
+          const wasClosed = pastGrnsForItem.some(g => {
+            const match = g.items?.find(gi => (gi.materialId || gi.itemCode) === key);
+            return match && match.keepPending === false;
+          });
+
           const pastReceived = poGrns.reduce((sum, g) => {
             const match = g.items?.find(gi => (gi.materialId || gi.itemCode) === key);
             return sum + (match ? Number(match.receivedQty || 0) : 0);
           }, 0);
-          const pendingQty = Math.max(0, item.qty - pastReceived);
+
+          const pendingQty = wasClosed ? 0 : Math.max(0, item.qty - pastReceived);
 
           return {
             materialId: key,
@@ -256,7 +267,8 @@ export default function StoreGRN() {
             poQty: item.qty,
             prevReceived: pastReceived,
             pendingQty: pendingQty,
-            receivedQty: pendingQty,
+            keepPending: pendingQty > 0,
+            receivedQty: 0,
             rejectedQty: 0,
             damageRemarks: '',
             qualityOk: true,
@@ -423,10 +435,32 @@ export default function StoreGRN() {
             }
           });
 
-          // Check if all PO items are fully received
+          // Check if all PO items are fully received or closed
           const isFullyReceived = po.items.every((poItem) => {
-            const key = String(poItem.itemName || '').toLowerCase().trim();
-            const cumulativeReceived = receivedMap[key] || 0;
+            const keyName = String(poItem.itemName || '').toLowerCase().trim();
+            
+            // Check if closed (keepPending === false) in the current GRN
+            const currentItem = cleanedItems.find(it => String(it.name || '').toLowerCase().trim() === keyName);
+            if (currentItem && currentItem.keepPending === false) {
+              return true; // Marked not pending in this GRN
+            }
+
+            // Check if closed in any past GRNs
+            let isClosedInPast = false;
+            grns.forEach(grn => {
+              if (grn.poRef === po.id || grn.poId === po.id) {
+                const pastItem = grn.items?.find(it => String(it.name || '').toLowerCase().trim() === keyName);
+                if (pastItem && pastItem.keepPending === false) {
+                  isClosedInPast = true;
+                }
+              }
+            });
+            if (isClosedInPast) {
+              return true;
+            }
+
+            // Otherwise, check if cumulative received is >= PO quantity
+            const cumulativeReceived = receivedMap[keyName] || 0;
             return cumulativeReceived >= Number(poItem.qty || 0);
           });
 
@@ -534,6 +568,7 @@ export default function StoreGRN() {
                        <th className="text-right">PO Qty</th>
                        <th className="text-right">Prev Received</th>
                        <th className="text-right">Pending Qty</th>
+                       <th className="text-center">Pending?</th>
                        <th className="text-right">Received Qty</th>
                        <th className="text-right">Rejected Qty</th>
                        <th className="text-right">Unit Price (₹)</th>
@@ -545,7 +580,7 @@ export default function StoreGRN() {
                  <tbody>
                     {formData.items.length === 0 ? (
                       <tr>
-                        <td colSpan="11" className="text-center p-8 text-text-gray italic">
+                        <td colSpan="12" className="text-center p-8 text-text-gray italic">
                           No items added yet. Click "Add Item" below to add materials manually.
                         </td>
                       </tr>
@@ -557,7 +592,7 @@ export default function StoreGRN() {
                                 <div>
                                   <span className="font-medium text-text-dark block">{item.name || '—'}</span>
                                   {item.materialId && (
-                                    <span className="text-xs text-text-gray font-mono">{item.materialId}</span>
+                                    <span className="text-[10px] text-text-gray font-mono">{item.materialId}</span>
                                   )}
                                 </div>
                               ) : (
@@ -580,6 +615,20 @@ export default function StoreGRN() {
                            </td>
                            <td className="text-right font-medium text-warning font-semibold">
                               {item.fromPO ? (item.pendingQty ?? 0) : '—'}
+                           </td>
+                           <td className="text-center p-2">
+                              {item.fromPO ? (
+                                <input 
+                                  type="checkbox" 
+                                  className="w-4 h-4 mx-auto cursor-pointer"
+                                  checked={item.keepPending ?? true}
+                                  onChange={(e) => {
+                                    const newItems = [...formData.items];
+                                    newItems[index].keepPending = e.target.checked;
+                                    setFormData({...formData, items: newItems});
+                                  }}
+                                />
+                              ) : '—'}
                            </td>
                            <td className="p-2 w-28">
                               <input 
@@ -882,6 +931,7 @@ export default function StoreGRN() {
                       <th className="px-4 py-2 text-right">PO Qty</th>
                       <th className="px-4 py-2 text-right">Received</th>
                       <th className="px-4 py-2 text-right">Rejected</th>
+                      <th className="px-4 py-2 text-center">Pending?</th>
                       <th className="px-4 py-2 text-center">Quality OK</th>
                       <th className="px-4 py-2 text-left">Damage Remarks</th>
                     </tr>
@@ -896,6 +946,9 @@ export default function StoreGRN() {
                         <td className="px-4 py-2 text-right">{item.poQty !== undefined && item.poQty !== null ? item.poQty : '—'}</td>
                         <td className="px-4 py-2 text-right font-bold text-primary">{item.receivedQty}</td>
                         <td className="px-4 py-2 text-right text-error">{item.rejectedQty || 0}</td>
+                        <td className="px-4 py-2 text-center">
+                          {item.fromPO ? (item.keepPending === false ? 'No' : 'Yes') : '—'}
+                        </td>
                         <td className="px-4 py-2 text-center">
                           {item.qualityOk
                             ? <CheckCircle className="w-4 h-4 text-success mx-auto" />
