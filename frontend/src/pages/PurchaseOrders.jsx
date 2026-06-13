@@ -486,6 +486,7 @@ export default function PurchaseOrders() {
       // 5. Items Table
       const tableData = po.items.map((item, idx) => [
         idx + 1,
+        item.itemCode || '—',
         item.itemName || '—',
         item.qty || 0,
         item.unit || 'Nos',
@@ -494,39 +495,40 @@ export default function PurchaseOrders() {
       ]);
 
       const footRows = [
-        ['', '', '', '', 'Subtotal', `Rs. ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+        ['', '', '', '', '', 'Subtotal', `Rs. ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
       ];
       
       // Push each split GST row
       taxBreakdown.forEach(row => {
-        footRows.push(['', '', '', '', row.label, `Rs. ${row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+        footRows.push(['', '', '', '', '', row.label, `Rs. ${row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
       });
       
-      // Push freight charges row
-      const hasFreight = po.freightCharges && po.freightCharges !== '0' && po.freightCharges !== 0;
-      if (hasFreight) {
-        const freightVal = Number(po.freightCharges);
-        const freightStr = !isNaN(freightVal) ? `Rs. ${freightVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : po.freightCharges;
-        footRows.push(['', '', '', '', 'Freight Charges', freightStr]);
+      // Helper function to format charge value for PDF
+      const getChargeStr = (val) => {
+        const numVal = Number(val);
+        return !isNaN(numVal) ? `Rs. ${numVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : val;
+      };
+
+      if (displayCharges(po.freightCharges)) {
+        footRows.push(['', '', '', '', '', 'Freight Charges', getChargeStr(po.freightCharges)]);
       }
-      
-      if (loading > 0) {
-        footRows.push(['', '', '', '', 'Loading Charges', `Rs. ${loading.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      if (displayCharges(po.loadingCharges)) {
+        footRows.push(['', '', '', '', '', 'Loading Charges', getChargeStr(po.loadingCharges)]);
       }
-      if (unloading > 0) {
-        footRows.push(['', '', '', '', 'Unloading Charges', `Rs. ${unloading.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      if (displayCharges(po.unloadingCharges)) {
+        footRows.push(['', '', '', '', '', 'Unloading Charges', getChargeStr(po.unloadingCharges)]);
       }
-      if (weighing > 0) {
-        footRows.push(['', '', '', '', 'Weighing Charges', `Rs. ${weighing.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      if (displayCharges(po.weighingCharges)) {
+        footRows.push(['', '', '', '', '', 'Weighing Charges', getChargeStr(po.weighingCharges)]);
       }
-      footRows.push(['', '', totalQty, mainUnit, 'GRAND TOTAL', `Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
+      footRows.push(['', '', '', totalQty, mainUnit, 'GRAND TOTAL', `Rs. ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`]);
 
       const tableConfig = {
         startY: 93,
         margin: { left: 10, right: 10 },
         tableWidth: 190,
         theme: 'grid',
-        head: [['SL. No.', 'Description Of Goods', 'QTY', 'UNIT', 'Rate', 'Total']],
+        head: [['SL. No.', 'Item Code', 'Description Of Goods', 'QTY', 'UNIT', 'Rate', 'Total']],
         body: tableData,
         foot: footRows,
         styles: { lineColor: [0, 0, 0], lineWidth: 0.3, overflow: 'linebreak' },
@@ -535,11 +537,12 @@ export default function PurchaseOrders() {
         footStyles: { textColor: [0, 0, 0], fontSize: 9, lineWidth: 0.3, lineColor: [0, 0, 0] },
         columnStyles: {
           0: { cellWidth: 12, halign: 'center' },
-          1: { cellWidth: 80, halign: 'left' },
-          2: { cellWidth: 22, halign: 'center' },
-          3: { cellWidth: 18, halign: 'center' },
-          4: { cellWidth: 28, halign: 'right' },
-          5: { cellWidth: 30, halign: 'right' }
+          1: { cellWidth: 25, halign: 'left' },
+          2: { cellWidth: 63, halign: 'left' },
+          3: { cellWidth: 20, halign: 'center' },
+          4: { cellWidth: 16, halign: 'center' },
+          5: { cellWidth: 26, halign: 'right' },
+          6: { cellWidth: 28, halign: 'right' }
         },
         didParseCell: function (data) {
           if (data.section === 'foot') {
@@ -754,9 +757,9 @@ export default function PurchaseOrders() {
       date: new Date(form.date).toISOString(),
       deliveryDate: form.deliveryDate ? new Date(form.deliveryDate).toISOString() : '',
       deliveryTerms: form.deliveryTerms ? new Date(form.deliveryTerms).toISOString() : '',
-      loadingCharges: Number(form.loadingCharges) || 0,
-      unloadingCharges: Number(form.unloadingCharges) || 0,
-      weighingCharges: Number(form.weighingCharges) || 0,
+      loadingCharges: form.loadingCharges || '0',
+      unloadingCharges: form.unloadingCharges || '0',
+      weighingCharges: form.weighingCharges || '0',
     };
 
     let result;
@@ -934,22 +937,28 @@ export default function PurchaseOrders() {
                 </span>
               </div>
             )}
-            {selectedPO.loadingCharges > 0 && (
+            {displayCharges(selectedPO.loadingCharges) && (
               <div className="flex justify-between text-sm">
                 <span className="text-text-gray">Loading Charges:</span>
-                <span className="font-semibold">₹{selectedPO.loadingCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <span className="font-semibold">
+                  {isNaN(Number(selectedPO.loadingCharges)) ? selectedPO.loadingCharges : `₹${Number(selectedPO.loadingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                </span>
               </div>
             )}
-            {selectedPO.unloadingCharges > 0 && (
+            {displayCharges(selectedPO.unloadingCharges) && (
               <div className="flex justify-between text-sm">
                 <span className="text-text-gray">Unloading Charges:</span>
-                <span className="font-semibold">₹{selectedPO.unloadingCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <span className="font-semibold">
+                  {isNaN(Number(selectedPO.unloadingCharges)) ? selectedPO.unloadingCharges : `₹${Number(selectedPO.unloadingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                </span>
               </div>
             )}
-            {selectedPO.weighingCharges > 0 && (
+            {displayCharges(selectedPO.weighingCharges) && (
               <div className="flex justify-between text-sm">
                 <span className="text-text-gray">Weighing Charges:</span>
-                <span className="font-semibold">₹{selectedPO.weighingCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <span className="font-semibold">
+                  {isNaN(Number(selectedPO.weighingCharges)) ? selectedPO.weighingCharges : `₹${Number(selectedPO.weighingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                </span>
               </div>
             )}
             <div className="h-px bg-border" />
@@ -1650,22 +1659,28 @@ export default function PurchaseOrders() {
                       </span>
                     </div>
                   )}
-                  {form.loadingCharges > 0 && (
+                  {displayCharges(form.loadingCharges) && (
                     <div className="flex justify-between text-sm">
                       <span className="text-text-gray">Loading Charges:</span>
-                      <span className="font-semibold">₹{parseFloat(form.loadingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span className="font-semibold">
+                        {isNaN(Number(form.loadingCharges)) ? form.loadingCharges : `₹${parseFloat(form.loadingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                      </span>
                     </div>
                   )}
-                  {form.unloadingCharges > 0 && (
+                  {displayCharges(form.unloadingCharges) && (
                     <div className="flex justify-between text-sm">
                       <span className="text-text-gray">Unloading Charges:</span>
-                      <span className="font-semibold">₹{parseFloat(form.unloadingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span className="font-semibold">
+                        {isNaN(Number(form.unloadingCharges)) ? form.unloadingCharges : `₹${parseFloat(form.unloadingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                      </span>
                     </div>
                   )}
-                  {form.weighingCharges > 0 && (
+                  {displayCharges(form.weighingCharges) && (
                     <div className="flex justify-between text-sm">
                       <span className="text-text-gray">Weighing Charges:</span>
-                      <span className="font-semibold">₹{parseFloat(form.weighingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span className="font-semibold">
+                        {isNaN(Number(form.weighingCharges)) ? form.weighingCharges : `₹${parseFloat(form.weighingCharges).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                      </span>
                     </div>
                   )}
                   <div className="h-px bg-primary/20" />

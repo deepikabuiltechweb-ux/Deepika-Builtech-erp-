@@ -23,9 +23,9 @@ const purchaseOrderSchema = new mongoose.Schema({
   vendorContact: { type: String },
   vendorEmail: { type: String },
   freightCharges: { type: String, default: '0' },
-  loadingCharges: { type: Number, default: 0 },
-  unloadingCharges: { type: Number, default: 0 },
-  weighingCharges: { type: Number, default: 0 },
+  loadingCharges: { type: String, default: '0' },
+  unloadingCharges: { type: String, default: '0' },
+  weighingCharges: { type: String, default: '0' },
   taxType: { type: String, default: 'Intra-State' }
 }, { timestamps: true });
 
