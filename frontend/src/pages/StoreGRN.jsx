@@ -217,22 +217,35 @@ export default function StoreGRN() {
   const handlePOSelect = (poId) => {
     const po = purchaseOrders.find(p => p.id === poId);
     if (po) {
+      // Find all GRNs associated with this PO to compute past received quantities
+      const poGrns = grns.filter(g => g.poRef === po.id || g.poId === po.id);
+
       setFormData({
         ...formData,
         poRef: poId,
         vendorId: po.vendorId,
-        items: po.items.map(item => ({
-          materialId: item.materialId || item.itemCode || '',
-          name: item.itemName,
-          poQty: item.qty,
-          receivedQty: item.qty,
-          rejectedQty: 0,
-          damageRemarks: '',
-          qualityOk: true,
-          unitPrice: item.rate,
-          fromPO: true,
-          unit: item.unit || 'Nos'
-        }))
+        items: po.items.map(item => {
+          const key = item.materialId || item.itemCode;
+          const pastReceived = poGrns.reduce((sum, g) => {
+            const match = g.items?.find(gi => (gi.materialId || gi.itemCode) === key);
+            return sum + (match ? Number(match.receivedQty || 0) : 0);
+          }, 0);
+          const pendingQty = Math.max(0, item.qty - pastReceived);
+
+          return {
+            materialId: item.materialId || item.itemCode || '',
+            name: item.itemName,
+            poQty: item.qty,
+            pendingQty: pendingQty,
+            receivedQty: pendingQty,
+            rejectedQty: 0,
+            damageRemarks: '',
+            qualityOk: true,
+            unitPrice: item.rate,
+            fromPO: true,
+            unit: item.unit || 'Nos'
+          };
+        })
       });
     } else {
       setFormData({
@@ -296,6 +309,30 @@ export default function StoreGRN() {
     if (hasInvalidItem) {
       toast.error("Please select a valid material for all items!");
       return;
+    }
+
+    // Check if any item's receivedQty exceeds its pendingQty (or poQty)
+    const itemsWithExcess = formData.items.filter(item => {
+      if (item.fromPO) {
+        const limit = item.pendingQty !== undefined ? item.pendingQty : item.poQty;
+        return Number(item.receivedQty) > Number(limit);
+      }
+      return false;
+    });
+
+    if (itemsWithExcess.length > 0) {
+      const excessDetails = itemsWithExcess.map(item => {
+        const limit = item.pendingQty !== undefined ? item.pendingQty : item.poQty;
+        return `- ${item.name}: Received Qty (${item.receivedQty}) > Pending/PO Qty (${limit})`;
+      }).join('\n');
+
+      const confirmSave = window.confirm(
+        `Warning: The received quantity exceeds the pending/PO quantity for the following item(s):\n\n${excessDetails}\n\nDo you want to proceed and save the GRN anyway?`
+      );
+
+      if (!confirmSave) {
+        return;
+      }
     }
 
     const po = purchaseOrders.find(p => p.id === formData.poRef);
@@ -488,7 +525,16 @@ export default function StoreGRN() {
                            <td>
                               <span className="font-mono text-xs text-text-gray">{item.materialId || '—'}</span>
                            </td>
-                           <td className="text-right font-medium text-text-gray">{item.fromPO ? item.poQty : '—'}</td>
+                           <td className="text-right font-medium text-text-gray">
+                              {item.fromPO ? (
+                                <div>
+                                  <span className="block">{item.poQty}</span>
+                                  {item.pendingQty !== undefined && item.pendingQty !== item.poQty && (
+                                    <span className="text-[10px] text-warning font-semibold block">(Pending: {item.pendingQty})</span>
+                                  )}
+                                </div>
+                              ) : '—'}
+                            </td>
                            <td className="p-2 w-28">
                               <input 
                                 type="number" 
