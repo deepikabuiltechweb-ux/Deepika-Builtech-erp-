@@ -224,7 +224,7 @@ export default function StoreGRN() {
         ...formData,
         poRef: poId,
         vendorId: po.vendorId,
-        items: po.items.map(item => {
+        items: po.items.map((item, idx) => {
           const key = item.materialId || item.itemCode;
           const pastReceived = poGrns.reduce((sum, g) => {
             const match = g.items?.find(gi => (gi.materialId || gi.itemCode) === key);
@@ -232,8 +232,24 @@ export default function StoreGRN() {
           }, 0);
           const pendingQty = Math.max(0, item.qty - pastReceived);
 
+          // Resolve material ID if empty
+          let materialId = item.materialId || item.itemCode || '';
+          if (!materialId) {
+            const matchingMat = materials.find(m => m.name?.toLowerCase().trim() === item.itemName?.toLowerCase().trim());
+            if (matchingMat) {
+              materialId = matchingMat.id;
+            } else {
+              // Generate a unique incremental MATxxx ID
+              const maxIdNum = materials.reduce((max, m) => {
+                const num = parseInt(m.id?.replace(/\D/g, '') || 0);
+                return isNaN(num) ? max : (num > max ? num : max);
+              }, 0);
+              materialId = `MAT${String(maxIdNum + 1 + idx).padStart(3, '0')}`;
+            }
+          }
+
           return {
-            materialId: item.materialId || item.itemCode || '',
+            materialId: materialId,
             name: item.itemName,
             poQty: item.qty,
             pendingQty: pendingQty,
@@ -508,10 +524,12 @@ export default function StoreGRN() {
                       formData.items.map((item, index) => (
                         <tr key={item.id || index}>
                            <td>
-                              {item.fromPO && item.name && item.materialId ? (
+                              {item.fromPO ? (
                                 <div>
-                                  <span className="font-medium text-text-dark block">{item.name}</span>
-                                  <span className="text-xs text-text-gray font-mono">{item.materialId}</span>
+                                  <span className="font-medium text-text-dark block">{item.name || '—'}</span>
+                                  {item.materialId && (
+                                    <span className="text-xs text-text-gray font-mono">{item.materialId}</span>
+                                  )}
                                 </div>
                               ) : (
                                 <Autocomplete 
