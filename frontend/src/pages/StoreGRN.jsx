@@ -133,7 +133,8 @@ export default function StoreGRN() {
         idx + 1,
         item.materialId || '—',
         item.name || '—',
-        item.unitPrice ? `Rs. ${Number(item.unitPrice).toLocaleString()}` : '—',
+        item.unitPrice ? `Rs. ${Number(item.unitPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—',
+        item.unitPrice ? `Rs. ${(Number(item.receivedQty || 0) * Number(item.unitPrice)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—',
         item.poQty || 0,
         item.receivedQty || 0,
         item.rejectedQty || 0,
@@ -144,7 +145,7 @@ export default function StoreGRN() {
 
       const tableConfig = {
         startY: 104,
-        head: [['#', 'Item Code', 'Material Description', 'Price', 'PO Qty', 'Received Qty', 'Rejected Qty', 'Pending?', 'Quality Status', 'Remarks / Damages']],
+        head: [['#', 'Item Code', 'Material Description', 'Unit Price', 'Total Price', 'PO Qty', 'Received Qty', 'Rejected Qty', 'Pending?', 'Quality Status', 'Remarks / Damages']],
         body: tableData,
         headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9 },
         bodyStyles: { fontSize: 9 },
@@ -152,11 +153,12 @@ export default function StoreGRN() {
           0: { cellWidth: 8 },
           1: { cellWidth: 18 },
           3: { halign: 'right', cellWidth: 18 },
-          4: { halign: 'right', cellWidth: 15 },
-          5: { halign: 'right', cellWidth: 20 },
+          4: { halign: 'right', cellWidth: 20 },
+          5: { halign: 'right', cellWidth: 15 },
           6: { halign: 'right', cellWidth: 20 },
-          7: { halign: 'center', cellWidth: 15 },
-          8: { halign: 'center', cellWidth: 18 }
+          7: { halign: 'right', cellWidth: 20 },
+          8: { halign: 'center', cellWidth: 15 },
+          9: { halign: 'center', cellWidth: 18 }
         },
         alternateRowStyles: { fillColor: [245, 247, 255] },
       };
@@ -572,6 +574,7 @@ export default function StoreGRN() {
                        <th className="text-right">Received Qty</th>
                        <th className="text-right">Rejected Qty</th>
                        <th className="text-right">Unit Price (₹)</th>
+                       <th className="text-right">Total Price (₹)</th>
                        <th>Damage Remarks</th>
                        <th className="text-center">Quality OK</th>
                        <th className="w-12"></th>
@@ -580,7 +583,7 @@ export default function StoreGRN() {
                  <tbody>
                     {formData.items.length === 0 ? (
                       <tr>
-                        <td colSpan="12" className="text-center p-8 text-text-gray italic">
+                        <td colSpan="13" className="text-center p-8 text-text-gray italic">
                           No items added yet. Click "Add Item" below to add materials manually.
                         </td>
                       </tr>
@@ -654,18 +657,11 @@ export default function StoreGRN() {
                                 }}
                               />
                            </td>
-                           <td className="p-2 w-28">
-                              <input 
-                                type="number" 
-                                step="0.01"
-                                className="input-field text-right" 
-                                value={item.unitPrice === 0 || item.unitPrice === '0' ? '' : item.unitPrice}
-                                onChange={(e) => {
-                                  const newItems = [...formData.items];
-                                  newItems[index].unitPrice = e.target.value;
-                                  setFormData({...formData, items: newItems});
-                                }}
-                              />
+                           <td className="p-2 text-right font-medium text-text-gray">
+                              ₹{Number(item.unitPrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                           </td>
+                           <td className="p-2 text-right font-bold text-text-dark">
+                              ₹{(Number(item.receivedQty || 0) * Number(item.unitPrice || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                            </td>
                            <td className="p-2">
                               <input 
@@ -928,6 +924,7 @@ export default function StoreGRN() {
                       <th className="px-4 py-2 text-left">Item Code</th>
                       <th className="px-4 py-2 text-left">Item Description</th>
                       <th className="px-4 py-2 text-right">Unit Price</th>
+                      <th className="px-4 py-2 text-right">Total Price</th>
                       <th className="px-4 py-2 text-right">PO Qty</th>
                       <th className="px-4 py-2 text-right">Received</th>
                       <th className="px-4 py-2 text-right">Rejected</th>
@@ -942,7 +939,8 @@ export default function StoreGRN() {
                         <td className="px-4 py-2 text-text-gray">{idx + 1}</td>
                         <td className="px-4 py-2 font-mono text-xs">{item.materialId || '—'}</td>
                         <td className="px-4 py-2 font-medium">{item.name}</td>
-                        <td className="px-4 py-2 text-right font-semibold">₹{Number(item.unitPrice || 0).toLocaleString()}</td>
+                        <td className="px-4 py-2 text-right font-semibold">₹{Number(item.unitPrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-4 py-2 text-right font-bold text-text-dark">₹{(Number(item.receivedQty || 0) * Number(item.unitPrice || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         <td className="px-4 py-2 text-right">{item.poQty !== undefined && item.poQty !== null ? item.poQty : '—'}</td>
                         <td className="px-4 py-2 text-right font-bold text-primary">{item.receivedQty}</td>
                         <td className="px-4 py-2 text-right text-error">{item.rejectedQty || 0}</td>
