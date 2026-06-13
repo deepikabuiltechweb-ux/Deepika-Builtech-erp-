@@ -568,7 +568,6 @@ export default function StoreGRN() {
                        <th className="w-1/3">Item Description</th>
                        <th>Item Code</th>
                        <th className="text-right">PO Qty</th>
-                       <th className="text-right">Prev Received</th>
                        <th className="text-right">Pending Qty</th>
                        <th className="text-center">Pending?</th>
                        <th className="text-right">Received Qty</th>
@@ -583,7 +582,7 @@ export default function StoreGRN() {
                  <tbody>
                     {formData.items.length === 0 ? (
                       <tr>
-                        <td colSpan="13" className="text-center p-8 text-text-gray italic">
+                        <td colSpan="12" className="text-center p-8 text-text-gray italic">
                           No items added yet. Click "Add Item" below to add materials manually.
                         </td>
                       </tr>
@@ -612,9 +611,6 @@ export default function StoreGRN() {
                            </td>
                            <td className="text-right font-medium text-text-gray">
                               {item.fromPO ? item.poQty : '—'}
-                           </td>
-                           <td className="text-right font-medium text-text-gray">
-                              {item.fromPO ? (item.prevReceived ?? 0) : '—'}
                            </td>
                            <td className="text-right font-medium text-warning font-semibold">
                               {item.fromPO ? (item.pendingQty ?? 0) : '—'}
