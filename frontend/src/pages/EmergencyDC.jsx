@@ -104,14 +104,6 @@ export default function EmergencyDC() {
     doc.text(`Project: ${dc.projectName || dc.projectId || '—'}`, 114, 74);
     doc.text(`Sent By: ${dc.purchasedBy || '—'}`, 114, 80);
 
-    // Challan Justification Section
-    doc.setFillColor(245, 247, 255); // Soft blue background
-    doc.rect(14, 104, 182, 10, 'F');
-    doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 64, 175); // Corporate Blue
-    doc.text(`SERVICE REASON: ${dc.emergencyReason || '—'}`, 18, 110);
-
     // Items Table
     const tableData = dc.items.map((item, idx) => [
       idx + 1,
@@ -123,7 +115,7 @@ export default function EmergencyDC() {
     ]);
 
     const tableConfig = {
-      startY: 118,
+      startY: 104,
       head: [['#', 'Machine / Equipment Description', 'Quantity', 'Unit', 'Est. Service Price', 'Est. Total Price']],
       body: tableData,
       headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9 }, // Corporate Blue Header
@@ -189,7 +181,7 @@ export default function EmergencyDC() {
     localVendorName: '',
     localVendorPhone: '',
     localVendorAddress: '',
-    emergencyReason: '',
+    emergencyReason: 'Breakdown Repair / Maintenance',
     purchasedBy: user?.name || '',
     approvedBy: '',
     paymentMode: 'Cash',
@@ -264,7 +256,7 @@ export default function EmergencyDC() {
         localVendorName: '',
         localVendorPhone: '',
         localVendorAddress: '',
-        emergencyReason: '',
+        emergencyReason: 'Breakdown Repair / Maintenance',
         purchasedBy: user?.name || '',
         approvedBy: '',
         paymentMode: 'Cash',
@@ -350,7 +342,7 @@ export default function EmergencyDC() {
             <h3 className="font-bold text-text-dark mb-4 flex items-center gap-2">
               <FileText className="w-5 h-5 text-primary" /> DC Information
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-text-gray mb-1">DC Date *</label>
                 <input
@@ -382,27 +374,6 @@ export default function EmergencyDC() {
                   {projects.map(p => (
                     <option key={p.id} value={p.id}>{p.id} - {p.name || p.projectName}</option>
                   ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Justification Info */}
-          <div className="card">
-            <h3 className="font-bold text-text-dark mb-4 flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-primary" /> Challan Justification
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-text-gray mb-1">Reason / Justification *</label>
-                <select
-                  className="input-field"
-                  value={form.emergencyReason}
-                  onChange={e => setForm({ ...form, emergencyReason: e.target.value })}
-                  required
-                >
-                  <option value="">-- Select Reason --</option>
-                  {EMERGENCY_REASONS.map(r => <option key={r}>{r}</option>)}
                 </select>
               </div>
               <div>
@@ -635,7 +606,6 @@ export default function EmergencyDC() {
                   <th>Date</th>
                   <th>Project</th>
                   <th>Service Center</th>
-                  <th>Reason</th>
                   <th>Sent By</th>
                   <th className="text-right">Est. Cost</th>
                   <th>Status</th>
@@ -645,7 +615,7 @@ export default function EmergencyDC() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-10 text-center text-text-gray italic">
+                    <td colSpan={8} className="p-10 text-center text-text-gray italic">
                       No Delivery Challans found.
                     </td>
                   </tr>
@@ -658,9 +628,6 @@ export default function EmergencyDC() {
                       </td>
                       <td className="text-text-gray">{dc.projectName || dc.projectId || '-'}</td>
                       <td className="font-medium">{dc.localVendorName}</td>
-                      <td className="text-sm text-text-gray max-w-[160px] truncate" title={dc.emergencyReason}>
-                        {dc.emergencyReason}
-                      </td>
                       <td>{dc.purchasedBy}</td>
                       <td className="text-right font-semibold text-text-dark whitespace-nowrap">
                         ₹{Number(dc.totalAmount || 0).toLocaleString('en-IN')}
@@ -758,12 +725,6 @@ export default function EmergencyDC() {
             </div>
 
             <div className="p-6 space-y-5">
-              {/* Justification Info */}
-              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-                <p className="text-xs uppercase font-bold tracking-widest text-primary mb-1">Reason / Justification</p>
-                <p className="font-semibold text-primary-dark">{viewDC.emergencyReason}</p>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div>
                   <p className="text-text-gray text-xs uppercase tracking-wide mb-0.5">Project</p>
