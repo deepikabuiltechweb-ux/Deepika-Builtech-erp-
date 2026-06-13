@@ -46,26 +46,29 @@ export default function Tools() {
 
   const handleSubmitTool = (e) => {
     e.preventDefault();
+    const totalQty = parseInt(toolFormData.totalQty) || 0;
+    const repairQty = parseInt(toolFormData.repairQty) || 0;
+
     if (!toolFormData.name.trim()) {
       toast.error("Please enter a tool name.");
       return;
     }
-    if (toolFormData.totalQty <= 0) {
+    if (totalQty <= 0) {
       toast.error("Total quantity must be greater than zero.");
       return;
     }
-    if (toolFormData.repairQty < 0) {
+    if (repairQty < 0) {
       toast.error("Repair quantity cannot be negative.");
       return;
     }
-    if (parseInt(toolFormData.repairQty) > parseInt(toolFormData.totalQty)) {
+    if (repairQty > totalQty) {
       toast.error("Repair quantity cannot exceed total quantity.");
       return;
     }
 
     if (editingTool) {
       const issuedQty = editingTool.totalQty - editingTool.availableQty - editingTool.repairQty;
-      const newAvailable = parseInt(toolFormData.totalQty) - parseInt(toolFormData.repairQty) - issuedQty;
+      const newAvailable = totalQty - repairQty - issuedQty;
       if (newAvailable < 0) {
         toast.error(`Cannot reduce stock. ${issuedQty} units are currently issued, so available quantity would become negative.`);
         return;
@@ -74,15 +77,15 @@ export default function Tools() {
       updateTool(editingTool.id, {
         name: toolFormData.name,
         category: toolFormData.category,
-        totalQty: parseInt(toolFormData.totalQty),
-        repairQty: parseInt(toolFormData.repairQty)
+        totalQty: totalQty,
+        repairQty: repairQty
       });
     } else {
       addTool({
         name: toolFormData.name,
         category: toolFormData.category,
-        totalQty: parseInt(toolFormData.totalQty),
-        repairQty: parseInt(toolFormData.repairQty)
+        totalQty: totalQty,
+        repairQty: repairQty
       });
     }
 
@@ -405,8 +408,8 @@ export default function Tools() {
                       min="1"
                       required
                       className="input-field text-sm"
-                      value={formData.qty}
-                      onChange={(e) => setFormData({ ...formData, qty: parseInt(e.target.value) || 1 })}
+                      value={formData.qty === 0 || formData.qty === '0' ? '' : formData.qty}
+                      onChange={(e) => setFormData({ ...formData, qty: e.target.value })}
                     />
                   </div>
 
@@ -546,8 +549,8 @@ export default function Tools() {
                       min="1"
                       required
                       className="input-field text-sm"
-                      value={toolFormData.totalQty}
-                      onChange={(e) => setToolFormData({ ...toolFormData, totalQty: parseInt(e.target.value) || 1 })}
+                      value={toolFormData.totalQty === 0 || toolFormData.totalQty === '0' ? '' : toolFormData.totalQty}
+                      onChange={(e) => setToolFormData({ ...toolFormData, totalQty: e.target.value })}
                     />
                   </div>
 
@@ -558,8 +561,8 @@ export default function Tools() {
                       min="0"
                       required
                       className="input-field text-sm"
-                      value={toolFormData.repairQty}
-                      onChange={(e) => setToolFormData({ ...toolFormData, repairQty: parseInt(e.target.value) || 0 })}
+                      value={toolFormData.repairQty === 0 || toolFormData.repairQty === '0' ? '' : toolFormData.repairQty}
+                      onChange={(e) => setToolFormData({ ...toolFormData, repairQty: e.target.value })}
                     />
                   </div>
                 </div>

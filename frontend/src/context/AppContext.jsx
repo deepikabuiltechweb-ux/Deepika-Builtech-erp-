@@ -534,11 +534,25 @@ export const AppProvider = ({ children }) => {
   // --- GRN Functions ---
   const addGRN = async (grn) => {
     try {
+      const dateStr = grn.grnDate || '';
+      let year = new Date().getFullYear();
+      const yearMatch = dateStr.match(/^(\d{4})-\d{2}-\d{2}/) || dateStr.match(/\b(20\d{2})\b/);
+      if (yearMatch) year = parseInt(yearMatch[1], 10);
+
       const maxIdNum = grns.reduce((max, g) => {
-        const num = parseInt(g.id?.replace(/\D/g, '') || 0);
-        return num > max ? num : max;
+        if (g.id) {
+          const regex = new RegExp(`^GRN-${year}-(\\d+)$`);
+          const match = g.id.match(regex);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num < 100000) {
+              return num > max ? num : max;
+            }
+          }
+        }
+        return max;
       }, 0);
-      const grnId = `GRN-2024-${String(maxIdNum + 1).padStart(3, '0')}`;
+      const grnId = `GRN-${year}-${String(maxIdNum + 1).padStart(3, '0')}`;
       const newGRN = { ...grn, id: grnId };
       const response = await axios.post(`${API_BASE_URL}/grns`, newGRN);
       setGrns(prev => [...prev, response.data.data || response.data]);
@@ -581,11 +595,25 @@ export const AppProvider = ({ children }) => {
   // --- Material Issue Functions ---
   const addIssue = async (issue) => {
     try {
+      const dateStr = issue.issueDate || '';
+      let year = new Date().getFullYear();
+      const yearMatch = dateStr.match(/^(\d{4})-\d{2}-\d{2}/) || dateStr.match(/\b(20\d{2})\b/);
+      if (yearMatch) year = parseInt(yearMatch[1], 10);
+
       const maxIdNum = issues.reduce((max, i) => {
-        const num = parseInt(i.id?.replace(/\D/g, '') || 0);
-        return num > max ? num : max;
+        if (i.id) {
+          const regex = new RegExp(`^ISS-${year}-(\\d+)$`);
+          const match = i.id.match(regex);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num < 100000) {
+              return num > max ? num : max;
+            }
+          }
+        }
+        return max;
       }, 0);
-      const issueId = `ISS-2024-${String(maxIdNum + 1).padStart(3, '0')}`;
+      const issueId = `ISS-${year}-${String(maxIdNum + 1).padStart(3, '0')}`;
       const newIssue = { ...issue, id: issueId };
       const response = await axios.post(`${API_BASE_URL}/issues`, newIssue);
       setIssues(prev => [...prev, response.data.data || response.data]);

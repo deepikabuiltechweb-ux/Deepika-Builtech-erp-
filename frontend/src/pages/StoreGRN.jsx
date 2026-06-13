@@ -214,6 +214,24 @@ export default function StoreGRN() {
     remarks: ''
   });
 
+  const getPOItemKey = (item, idx, materialsList) => {
+    let key = item.materialId || item.itemCode || '';
+    if (!key) {
+      const matchingMat = materialsList.find(m => m.name?.toLowerCase().trim() === item.itemName?.toLowerCase().trim());
+      if (matchingMat) {
+        key = matchingMat.id;
+      } else {
+        // Generate a unique incremental MATxxx ID
+        const maxIdNum = materialsList.reduce((max, m) => {
+          const num = parseInt(m.id?.replace(/\D/g, '') || 0);
+          return isNaN(num) ? max : (num > max ? num : max);
+        }, 0);
+        key = `MAT${String(maxIdNum + 1 + idx).padStart(3, '0')}`;
+      }
+    }
+    return key;
+  };
+
   const handlePOSelect = (poId) => {
     const po = purchaseOrders.find(p => p.id === poId);
     if (po) {
@@ -225,31 +243,15 @@ export default function StoreGRN() {
         poRef: poId,
         vendorId: po.vendorId,
         items: po.items.map((item, idx) => {
-          const key = item.materialId || item.itemCode;
+          const key = getPOItemKey(item, idx, materials);
           const pastReceived = poGrns.reduce((sum, g) => {
             const match = g.items?.find(gi => (gi.materialId || gi.itemCode) === key);
             return sum + (match ? Number(match.receivedQty || 0) : 0);
           }, 0);
           const pendingQty = Math.max(0, item.qty - pastReceived);
 
-          // Resolve material ID if empty
-          let materialId = item.materialId || item.itemCode || '';
-          if (!materialId) {
-            const matchingMat = materials.find(m => m.name?.toLowerCase().trim() === item.itemName?.toLowerCase().trim());
-            if (matchingMat) {
-              materialId = matchingMat.id;
-            } else {
-              // Generate a unique incremental MATxxx ID
-              const maxIdNum = materials.reduce((max, m) => {
-                const num = parseInt(m.id?.replace(/\D/g, '') || 0);
-                return isNaN(num) ? max : (num > max ? num : max);
-              }, 0);
-              materialId = `MAT${String(maxIdNum + 1 + idx).padStart(3, '0')}`;
-            }
-          }
-
           return {
-            materialId: materialId,
+            materialId: key,
             name: item.itemName,
             poQty: item.qty,
             pendingQty: pendingQty,
@@ -357,8 +359,16 @@ export default function StoreGRN() {
       ? (po?.vendorName || vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor')
       : (vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor');
 
+    const cleanedItems = formData.items.map(item => ({
+      ...item,
+      receivedQty: Number(item.receivedQty || 0),
+      rejectedQty: Number(item.rejectedQty || 0),
+      unitPrice: Number(item.unitPrice || 0)
+    }));
+
     const newGRN = {
       ...formData,
+      items: cleanedItems,
       poId: formData.poRef || '',
       vendorId,
       vendorName,
@@ -368,7 +378,7 @@ export default function StoreGRN() {
     const success = await addGRN(newGRN);
     if (success) {
       // Update stock using business logic in context
-      await updateStockOnGRN(formData.items);
+      await updateStockOnGRN(cleanedItems);
 
       // Update PO status dynamically if there is a PO reference
       if (formData.poRef) {
@@ -376,9 +386,9 @@ export default function StoreGRN() {
         if (po) {
           const receivedMap = {};
           
-          // Current GRN items
+          // Current GRN items (match by name)
           formData.items.forEach(item => {
-            const key = item.materialId || item.itemCode;
+            const key = String(item.name || '').toLowerCase().trim();
             if (key) {
               receivedMap[key] = (receivedMap[key] || 0) + (Number(item.receivedQty) || 0);
             }
@@ -388,7 +398,7 @@ export default function StoreGRN() {
           grns.forEach(grn => {
             if (grn.poRef === po.id || grn.poId === po.id) {
               grn.items.forEach(item => {
-                const key = item.materialId || item.itemCode;
+                const key = String(item.name || '').toLowerCase().trim();
                 if (key) {
                   receivedMap[key] = (receivedMap[key] || 0) + (Number(item.receivedQty) || 0);
                 }
@@ -397,10 +407,10 @@ export default function StoreGRN() {
           });
 
           // Check if all PO items are fully received
-          const isFullyReceived = po.items.every(poItem => {
-            const key = poItem.materialId || poItem.itemCode;
+          const isFullyReceived = po.items.every((poItem) => {
+            const key = String(poItem.itemName || '').toLowerCase().trim();
             const cumulativeReceived = receivedMap[key] || 0;
-            return cumulativeReceived >= poItem.qty;
+            return cumulativeReceived >= Number(poItem.qty || 0);
           });
 
           const status = isFullyReceived ? 'Complete' : 'Partial';
@@ -557,10 +567,10 @@ export default function StoreGRN() {
                               <input 
                                 type="number" 
                                 className="input-field text-right" 
-                                value={item.receivedQty}
+                                value={item.receivedQty === 0 || item.receivedQty === '0' ? '' : item.receivedQty}
                                 onChange={(e) => {
                                   const newItems = [...formData.items];
-                                  newItems[index].receivedQty = Number(e.target.value);
+                                  newItems[index].receivedQty = e.target.value;
                                   setFormData({...formData, items: newItems});
                                 }}
                               />
@@ -569,10 +579,10 @@ export default function StoreGRN() {
                               <input 
                                 type="number" 
                                 className="input-field text-right" 
-                                value={item.rejectedQty}
+                                value={item.rejectedQty === 0 || item.rejectedQty === '0' ? '' : item.rejectedQty}
                                 onChange={(e) => {
                                   const newItems = [...formData.items];
-                                  newItems[index].rejectedQty = Number(e.target.value);
+                                  newItems[index].rejectedQty = e.target.value;
                                   setFormData({...formData, items: newItems});
                                 }}
                               />
@@ -582,10 +592,10 @@ export default function StoreGRN() {
                                 type="number" 
                                 step="0.01"
                                 className="input-field text-right" 
-                                value={item.unitPrice}
+                                value={item.unitPrice === 0 || item.unitPrice === '0' ? '' : item.unitPrice}
                                 onChange={(e) => {
                                   const newItems = [...formData.items];
-                                  newItems[index].unitPrice = Number(e.target.value);
+                                  newItems[index].unitPrice = e.target.value;
                                   setFormData({...formData, items: newItems});
                                 }}
                               />
@@ -825,7 +835,7 @@ export default function StoreGRN() {
                 </button>
               </div>
             </div>
-            <div className="p-6 space-y-5">
+            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
               {/* Meta Info */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[

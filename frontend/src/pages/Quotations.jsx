@@ -114,7 +114,12 @@ export default function Quotations() {
 
   const handleSaveQuotation = async (e) => {
     e.preventDefault();
-    const success = await addQuotation(entryForm);
+    const cleanedItems = entryForm.items.map(item => ({
+      ...item,
+      unitPrice: Number(item.unitPrice || 0),
+      deliveryDays: Number(item.deliveryDays || 0)
+    }));
+    const success = await addQuotation({ ...entryForm, items: cleanedItems });
     if (success) {
       // Update enquiry status
       await updateEnquiry(entryForm.enquiryId, { status: 'Quoted' });
@@ -270,10 +275,10 @@ export default function Quotations() {
                         type="number" 
                         required
                         className="input-field text-right"
-                        value={item.unitPrice}
+                        value={item.unitPrice === 0 || item.unitPrice === '0' ? '' : item.unitPrice}
                         onChange={(e) => {
                           const newItems = [...entryForm.items];
-                          newItems[index].unitPrice = Number(e.target.value);
+                          newItems[index].unitPrice = e.target.value;
                           setEntryForm({...entryForm, items: newItems});
                         }}
                       />
@@ -312,10 +317,10 @@ export default function Quotations() {
                       <input 
                         type="number" 
                         className="input-field"
-                        value={item.deliveryDays}
+                        value={item.deliveryDays === 0 || item.deliveryDays === '0' ? '' : item.deliveryDays}
                         onChange={(e) => {
                           const newItems = [...entryForm.items];
-                          newItems[index].deliveryDays = Number(e.target.value);
+                          newItems[index].deliveryDays = e.target.value;
                           setEntryForm({...entryForm, items: newItems});
                         }}
                       />

@@ -205,14 +205,20 @@ export default function IssueMaterial() {
 
     setSubmitting(true);
     try {
+      const cleanedItems = formData.items.map(it => ({
+        ...it,
+        qty: Number(it.qty || 0),
+        rate: Number(it.rate || 0)
+      }));
       const newIssue = {
         ...formData,
-        totalCost: formData.items.reduce((acc, i) => acc + (i.qty * i.rate), 0)
+        items: cleanedItems,
+        totalCost: cleanedItems.reduce((acc, i) => acc + (i.qty * i.rate), 0)
       };
 
       const success = await addIssue(newIssue);
       if (success) {
-        await deductStockOnIssue(formData.items);
+        await deductStockOnIssue(cleanedItems);
         setShowForm(false);
         setFormData({
           issueDate: format(new Date(), 'yyyy-MM-dd'),
@@ -307,10 +313,10 @@ export default function IssueMaterial() {
                                  "input-field text-right",
                                  item.qty > item.available ? "border-error focus:ring-error/20" : ""
                                )}
-                               value={item.qty}
+                               value={item.qty === 0 || item.qty === '0' ? '' : item.qty}
                                onChange={(e) => {
                                  const newItems = [...formData.items];
-                                 newItems[index].qty = Number(e.target.value);
+                                 newItems[index].qty = e.target.value;
                                  setFormData({...formData, items: newItems});
                                }}
                             />

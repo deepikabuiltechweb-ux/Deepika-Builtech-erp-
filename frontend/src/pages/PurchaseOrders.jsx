@@ -3,7 +3,8 @@ import { useApp } from '../context/AppContext';
 import Autocomplete from '../components/ui/Autocomplete';
 import {
   ShoppingCart, Eye, Printer, Mail, CheckCircle, FileText,
-  Download, Trash2, Plus, X, PlusCircle, MinusCircle, FileEdit
+  Download, Trash2, Plus, X, PlusCircle, MinusCircle, FileEdit,
+  Search, Filter
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -138,6 +139,8 @@ export default function PurchaseOrders() {
     itemCode: '',
     text: ''
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
 
   // --- Form State ---
   const defaultDispatchFields = {
@@ -752,14 +755,25 @@ export default function PurchaseOrders() {
     if (form.items.some(it => !it.itemName.trim())) return toast.error('All items must have a name.');
     setSubmitting(true);
 
+    const cleanedItems = form.items.map(it => ({
+      ...it,
+      qty: parseFloat(it.qty) || 0,
+      rate: parseFloat(it.rate) || 0,
+      gst: parseFloat(it.gst) || 0,
+      gstAmt: parseFloat(it.gstAmt) || 0,
+      total: parseFloat(it.total) || 0,
+    }));
+
     const payload = {
       ...form,
       date: new Date(form.date).toISOString(),
       deliveryDate: form.deliveryDate ? new Date(form.deliveryDate).toISOString() : '',
       deliveryTerms: form.deliveryTerms ? new Date(form.deliveryTerms).toISOString() : '',
+      freightCharges: form.freightCharges || '0',
       loadingCharges: form.loadingCharges || '0',
       unloadingCharges: form.unloadingCharges || '0',
       weighingCharges: form.weighingCharges || '0',
+      items: cleanedItems,
     };
 
     let result;
@@ -992,6 +1006,19 @@ export default function PurchaseOrders() {
     );
   }
 
+  const filteredPurchaseOrders = purchaseOrders.filter(po => {
+    if (statusFilter !== 'All' && po.status !== statusFilter) return false;
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    if (!searchLower) return true;
+    
+    const poId = String(po.id || '').toLowerCase();
+    const vendorName = String(po.vendorName || vendors.find(v => v.id === po.vendorId)?.name || '').toLowerCase();
+    const projectName = String(projects.find(p => p.id === po.projectId)?.name || '').toLowerCase();
+    
+    return poId.includes(searchLower) || vendorName.includes(searchLower) || projectName.includes(searchLower);
+  });
+
   // ─── List View ────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -1011,6 +1038,51 @@ export default function PurchaseOrders() {
         )}
       </div>
 
+      {/* Search and Filter Section */}
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-white p-4 rounded-xl border border-border shadow-sm">
+        {/* Search Input */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-gray" />
+          <input
+            type="text"
+            placeholder="Search by PO No, Vendor Name, or Project..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="input-field pl-10 w-full text-sm"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-gray hover:text-text-dark"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter Status Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+          <span className="text-xs font-bold text-text-gray uppercase tracking-wider flex items-center gap-1 shrink-0">
+            <Filter className="w-3.5 h-3.5" /> Filter:
+          </span>
+          {['All', 'Sent', 'Partial', 'Complete'].map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setStatusFilter(status)}
+              className={cn(
+                "px-4 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer",
+                statusFilter === status
+                  ? "bg-primary border-primary text-white shadow-sm"
+                  : "bg-white border-border text-text-gray hover:bg-gray-50"
+              )}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* PO Table */}
       <div className="table-container">
         <table className="erp-table">
@@ -1026,14 +1098,16 @@ export default function PurchaseOrders() {
             </tr>
           </thead>
           <tbody>
-            {purchaseOrders.length === 0 ? (
+            {filteredPurchaseOrders.length === 0 ? (
               <tr>
                 <td colSpan="7" className="p-8 text-center text-text-gray italic">
-                  No Purchase Orders found. Click "New Purchase Order" to create one.
+                  {purchaseOrders.length === 0 
+                    ? 'No Purchase Orders found. Click "New Purchase Order" to create one.'
+                    : 'No matching Purchase Orders found.'}
                 </td>
               </tr>
             ) : (
-              purchaseOrders.map(po => {
+              filteredPurchaseOrders.map(po => {
                 const charges = (Number(po.freightCharges) || 0) + (Number(po.loadingCharges) || 0) + (Number(po.unloadingCharges) || 0) + (Number(po.weighingCharges) || 0);
                 const total = po.items.reduce((acc, i) => acc + Number(i.total), 0) + charges;
                 return (
@@ -1481,7 +1555,7 @@ export default function PurchaseOrders() {
                         className="input-field w-full text-right"
                         type="text"
                         placeholder="e.g. 0.00 or Extra"
-                        value={form.freightCharges}
+                        value={form.freightCharges === 0 || form.freightCharges === '0' ? '' : form.freightCharges}
                         onChange={e => setForm(f => ({ ...f, freightCharges: e.target.value }))}
                       />
                     </div>
@@ -1491,7 +1565,7 @@ export default function PurchaseOrders() {
                         className="input-field w-full text-right"
                         type="text"
                         placeholder="e.g. 0.00 or Extra"
-                        value={form.loadingCharges}
+                        value={form.loadingCharges === 0 || form.loadingCharges === '0' ? '' : form.loadingCharges}
                         onChange={e => setForm(f => ({ ...f, loadingCharges: e.target.value }))}
                       />
                     </div>
@@ -1501,7 +1575,7 @@ export default function PurchaseOrders() {
                         className="input-field w-full text-right"
                         type="text"
                         placeholder="e.g. 0.00 or Extra"
-                        value={form.unloadingCharges}
+                        value={form.unloadingCharges === 0 || form.unloadingCharges === '0' ? '' : form.unloadingCharges}
                         onChange={e => setForm(f => ({ ...f, unloadingCharges: e.target.value }))}
                       />
                     </div>
@@ -1511,7 +1585,7 @@ export default function PurchaseOrders() {
                         className="input-field w-full text-right"
                         type="text"
                         placeholder="e.g. 0.00 or Extra"
-                        value={form.weighingCharges}
+                        value={form.weighingCharges === 0 || form.weighingCharges === '0' ? '' : form.weighingCharges}
                         onChange={e => setForm(f => ({ ...f, weighingCharges: e.target.value }))}
                       />
                     </div>
@@ -1582,7 +1656,7 @@ export default function PurchaseOrders() {
                               type="number"
                               min="0.01"
                               step="0.01"
-                              value={item.qty}
+                              value={item.qty === 0 || item.qty === '0' ? '' : item.qty}
                               onChange={e => handleItemChange(idx, 'qty', e.target.value)}
                             />
                           </td>
@@ -1601,7 +1675,7 @@ export default function PurchaseOrders() {
                               type="number"
                               min="0"
                               step="0.01"
-                              value={item.rate}
+                              value={item.rate === 0 || item.rate === '0' ? '' : item.rate}
                               onChange={e => handleItemChange(idx, 'rate', e.target.value)}
                             />
                           </td>

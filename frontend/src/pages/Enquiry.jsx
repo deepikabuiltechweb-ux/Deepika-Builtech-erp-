@@ -130,7 +130,11 @@ export default function Enquiry() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = await addEnquiry(formData);
+    const cleanedItems = formData.items.map(it => ({
+      ...it,
+      qty: Number(it.qty || 0)
+    }));
+    const success = await addEnquiry({ ...formData, items: cleanedItems });
     if (success) {
       setShowForm(false);
       setSelectedEnq(null);
@@ -260,10 +264,10 @@ export default function Enquiry() {
                           type="number" 
                           required
                           className="input-field text-right"
-                          value={item.qty}
+                          value={item.qty === 0 || item.qty === '0' ? '' : item.qty}
                           onChange={(e) => {
                             const newItems = [...formData.items];
-                            newItems[index].qty = Number(e.target.value);
+                            newItems[index].qty = e.target.value;
                             setFormData({...formData, items: newItems});
                           }}
                         />

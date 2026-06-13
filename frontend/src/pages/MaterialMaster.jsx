@@ -25,14 +25,21 @@ export default function MaterialMaster() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const payload = {
+      ...formData,
+      minLevel: Number(formData.minLevel) || 0,
+      currentStock: Number(formData.currentStock) || 0,
+      latestPrice: Number(formData.latestPrice) || 0,
+      lastPrice: Number(formData.lastPrice) || 0
+    };
     if (editingId) {
-      const result = await updateMaterial(editingId, formData);
+      const result = await updateMaterial(editingId, payload);
       if (result) {
         setIsModalOpen(false);
         resetForm();
       }
     } else {
-      const result = await addMaterial(formData);
+      const result = await addMaterial(payload);
       if (result) {
         setIsModalOpen(false);
         resetForm();
@@ -276,8 +283,8 @@ export default function MaterialMaster() {
                   <input 
                     type="number" 
                     className="input-field text-right" 
-                    value={formData.minLevel}
-                    onChange={(e) => setFormData({...formData, minLevel: Number(e.target.value)})}
+                    value={formData.minLevel === 0 || formData.minLevel === '0' ? '' : formData.minLevel}
+                    onChange={(e) => setFormData({...formData, minLevel: e.target.value})}
                   />
                 </div>
                 <div>
@@ -285,8 +292,8 @@ export default function MaterialMaster() {
                   <input 
                     type="number" 
                     className="input-field text-right" 
-                    value={formData.currentStock}
-                    onChange={(e) => setFormData({...formData, currentStock: Number(e.target.value)})}
+                    value={formData.currentStock === 0 || formData.currentStock === '0' ? '' : formData.currentStock}
+                    onChange={(e) => setFormData({...formData, currentStock: e.target.value})}
                   />
                 </div>
                 <div>
@@ -294,8 +301,8 @@ export default function MaterialMaster() {
                   <input 
                     type="number" 
                     className="input-field text-right" 
-                    value={formData.latestPrice}
-                    onChange={(e) => setFormData({...formData, latestPrice: Number(e.target.value)})}
+                    value={formData.latestPrice === 0 || formData.latestPrice === '0' ? '' : formData.latestPrice}
+                    onChange={(e) => setFormData({...formData, latestPrice: e.target.value})}
                   />
                 </div>
               </div>

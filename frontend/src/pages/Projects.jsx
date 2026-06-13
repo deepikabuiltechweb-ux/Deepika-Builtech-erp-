@@ -24,14 +24,16 @@ export default function Projects() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const budget = Number(formData.budget) || 0;
+    const payload = { ...formData, budget };
     if (editingId) {
-      const result = await updateProject(editingId, formData);
+      const result = await updateProject(editingId, payload);
       if (result) {
         setIsModalOpen(false);
         resetForm();
       }
     } else {
-      const result = await addProject(formData);
+      const result = await addProject(payload);
       if (result) {
         setIsModalOpen(false);
         resetForm();
@@ -299,8 +301,8 @@ export default function Projects() {
                     type="number" 
                     required
                     className="input-field text-right" 
-                    value={formData.budget}
-                    onChange={(e) => setFormData({...formData, budget: Number(e.target.value)})}
+                    value={formData.budget === 0 || formData.budget === '0' ? '' : formData.budget}
+                    onChange={(e) => setFormData({...formData, budget: e.target.value})}
                   />
                 </div>
               </div>

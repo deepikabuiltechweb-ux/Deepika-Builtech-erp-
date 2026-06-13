@@ -247,7 +247,13 @@ export default function EmergencyDC() {
     if (!form.emergencyReason) { toast.error('Please select a reason / justification'); return; }
     if (form.items.some(i => !i.description.trim())) { toast.error('All item descriptions are required'); return; }
 
-    const payload = { ...form, totalAmount: grandTotal };
+    const cleanedItems = form.items.map(it => ({
+      ...it,
+      qty: parseFloat(it.qty) || 0,
+      unitPrice: parseFloat(it.unitPrice) || 0,
+      totalPrice: parseFloat(it.totalPrice) || 0
+    }));
+    const payload = { ...form, items: cleanedItems, totalAmount: grandTotal };
     const saved = await addEmergencyDC(payload);
     if (saved) {
       setShowForm(false);
@@ -510,7 +516,7 @@ export default function EmergencyDC() {
                           min="0"
                           step="any"
                           className="input-field text-right"
-                          value={item.qty}
+                          value={item.qty === 0 || item.qty === '0' ? '' : item.qty}
                           onChange={e => updateItem(idx, 'qty', e.target.value)}
                         />
                       </td>
@@ -531,7 +537,7 @@ export default function EmergencyDC() {
                           min="0"
                           step="0.01"
                           className="input-field text-right"
-                          value={item.unitPrice}
+                          value={item.unitPrice === 0 || item.unitPrice === '0' ? '' : item.unitPrice}
                           onChange={e => updateItem(idx, 'unitPrice', e.target.value)}
                         />
                       </td>
