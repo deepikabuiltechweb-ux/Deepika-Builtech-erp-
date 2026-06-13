@@ -254,6 +254,7 @@ export default function StoreGRN() {
             materialId: key,
             name: item.itemName,
             poQty: item.qty,
+            prevReceived: pastReceived,
             pendingQty: pendingQty,
             receivedQty: pendingQty,
             rejectedQty: 0,
@@ -322,6 +323,24 @@ export default function StoreGRN() {
       return;
     }
 
+    // Determine vendorId for duplicate validation
+    const po = purchaseOrders.find(p => p.id === formData.poRef);
+    const vendorId = formData.poRef ? (po?.vendorId || '') : formData.vendorId;
+    const dcNo = (formData.dcNo || '').trim();
+
+    if (dcNo) {
+      // Check if there is already a GRN with this dcNo / invoiceNo for the same vendor
+      const isDuplicate = grns.some(g => 
+        g.vendorId === vendorId && 
+        (String(g.dcNo || '').trim().toLowerCase() === dcNo.toLowerCase() || 
+         String(g.invoiceNo || '').trim().toLowerCase() === dcNo.toLowerCase())
+      );
+      if (isDuplicate) {
+        toast.error(`Duplicate DC / Invoice No: "${dcNo}" has already been entered for this vendor!`);
+        return;
+      }
+    }
+
     // Check if any item lacks a materialId
     const hasInvalidItem = formData.items.some(item => !item.materialId);
     if (hasInvalidItem) {
@@ -353,8 +372,6 @@ export default function StoreGRN() {
       }
     }
 
-    const po = purchaseOrders.find(p => p.id === formData.poRef);
-    const vendorId = formData.poRef ? (po?.vendorId || '') : formData.vendorId;
     const vendorName = formData.poRef
       ? (po?.vendorName || vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor')
       : (vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor');
@@ -515,6 +532,8 @@ export default function StoreGRN() {
                        <th className="w-1/3">Item Description</th>
                        <th>Item Code</th>
                        <th className="text-right">PO Qty</th>
+                       <th className="text-right">Prev Received</th>
+                       <th className="text-right">Pending Qty</th>
                        <th className="text-right">Received Qty</th>
                        <th className="text-right">Rejected Qty</th>
                        <th className="text-right">Unit Price (₹)</th>
@@ -526,7 +545,7 @@ export default function StoreGRN() {
                  <tbody>
                     {formData.items.length === 0 ? (
                       <tr>
-                        <td colSpan="9" className="text-center p-8 text-text-gray italic">
+                        <td colSpan="11" className="text-center p-8 text-text-gray italic">
                           No items added yet. Click "Add Item" below to add materials manually.
                         </td>
                       </tr>
@@ -554,15 +573,14 @@ export default function StoreGRN() {
                               <span className="font-mono text-xs text-text-gray">{item.materialId || '—'}</span>
                            </td>
                            <td className="text-right font-medium text-text-gray">
-                              {item.fromPO ? (
-                                <div>
-                                  <span className="block">{item.poQty}</span>
-                                  {item.pendingQty !== undefined && item.pendingQty !== item.poQty && (
-                                    <span className="text-[10px] text-warning font-semibold block">(Pending: {item.pendingQty})</span>
-                                  )}
-                                </div>
-                              ) : '—'}
-                            </td>
+                              {item.fromPO ? item.poQty : '—'}
+                           </td>
+                           <td className="text-right font-medium text-text-gray">
+                              {item.fromPO ? (item.prevReceived ?? 0) : '—'}
+                           </td>
+                           <td className="text-right font-medium text-warning font-semibold">
+                              {item.fromPO ? (item.pendingQty ?? 0) : '—'}
+                           </td>
                            <td className="p-2 w-28">
                               <input 
                                 type="number" 
