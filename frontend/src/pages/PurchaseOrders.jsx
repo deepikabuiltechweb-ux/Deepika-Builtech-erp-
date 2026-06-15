@@ -126,7 +126,7 @@ const emptyItem = () => ({
 export default function PurchaseOrders() {
   const {
     purchaseOrders, addPurchaseOrder, deletePurchaseOrder, updatePurchaseOrder,
-    vendors, projects, isAdmin, isPurchaseTeam, updateVendor, addVendor, addProject
+    vendors, projects, isAdmin, isPurchaseTeam, isStoreTeam, updateVendor, addVendor, addProject
   } = useApp();
 
   const [selectedPO, setSelectedPO] = useState(null);
@@ -1028,7 +1028,7 @@ export default function PurchaseOrders() {
           <h1 className="text-2xl font-bold text-text-dark">Purchase Orders</h1>
           <p className="text-text-gray">Manage and track your official material orders.</p>
         </div>
-        {(isAdmin || isPurchaseTeam) && (
+        {(isAdmin || isPurchaseTeam || isStoreTeam) && (
           <button
             onClick={() => setShowForm(true)}
             className="btn-primary flex items-center gap-2"
@@ -1150,7 +1150,7 @@ export default function PurchaseOrders() {
                         >
                           <Mail className="w-4 h-4" />
                         </button>
-                        {(isPurchaseTeam || isAdmin) && (
+                        {(isPurchaseTeam || isAdmin || isStoreTeam) && (
                           <button
                             title="Edit PO"
                             onClick={() => handleEditClick(po)}

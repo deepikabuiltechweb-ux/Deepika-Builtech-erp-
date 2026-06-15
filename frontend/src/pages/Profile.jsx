@@ -226,7 +226,7 @@ export default function Profile() {
                 { name: 'Store & Stock Receipt (GRN)', enabled: user?.role === 'store_team' || user?.role === 'admin' || user?.role === 'superadmin' },
                 { name: 'Material Issues Log', enabled: user?.role === 'store_team' || user?.role === 'admin' || user?.role === 'superadmin' },
                 { name: 'Local Delivery Challans', enabled: user?.role === 'store_team' || user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'staff' },
-                { name: 'Procurement & Purchase Orders', enabled: user?.role === 'purchase_team' || user?.role === 'admin' || user?.role === 'superadmin' },
+                { name: 'Procurement & Purchase Orders', enabled: user?.role === 'purchase_team' || user?.role === 'store_team' || user?.role === 'admin' || user?.role === 'superadmin' },
                 { name: 'Vendor Bids & Quotations', enabled: user?.role === 'purchase_team' || user?.role === 'admin' || user?.role === 'superadmin' },
                 { name: 'Reports & Business Intelligence', enabled: true },
               ].map(scope => (
