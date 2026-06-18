@@ -274,7 +274,7 @@ export default function IssueMaterial() {
               </div>
            </div>
 
-           <div className="card overflow-hidden">
+           <div className="card">
               <div className="p-4 bg-primary-dark text-white font-semibold flex items-center gap-2">
                  <Package className="w-5 h-5" /> Items to Issue
               </div>
