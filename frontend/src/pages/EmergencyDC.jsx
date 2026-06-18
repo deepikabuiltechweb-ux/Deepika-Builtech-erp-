@@ -45,6 +45,14 @@ function StatusBadge({ status }) {
 
 const emptyItem = () => ({ description: '', qty: 1, unit: 'Nos', unitPrice: 0, totalPrice: 0 });
 
+function getNextDCNo(emergencyDCs) {
+  const maxIdNum = emergencyDCs.reduce((max, d) => {
+    const num = parseInt(d.id?.replace(/\D/g, '') || 0);
+    return num > max ? num : max;
+  }, 0);
+  return `EDC-${String(maxIdNum + 1).padStart(4, '0')}`;
+}
+
 export default function EmergencyDC() {
   const { emergencyDCs, addEmergencyDC, deleteEmergencyDC, updateEmergencyDCStatus, projects, user, isAdmin } = useApp();
   const [showForm, setShowForm] = useState(false);
@@ -175,7 +183,7 @@ export default function EmergencyDC() {
 
   const [form, setForm] = useState({
     dcDate: format(new Date(), 'yyyy-MM-dd'),
-    dcNo: '',
+    dcNo: getNextDCNo(emergencyDCs),
     projectId: '',
     projectName: '',
     localVendorName: '',
@@ -250,7 +258,7 @@ export default function EmergencyDC() {
       setShowForm(false);
       setForm({
         dcDate: format(new Date(), 'yyyy-MM-dd'),
-        dcNo: '',
+        dcNo: getNextDCNo([...emergencyDCs, saved]),
         projectId: '',
         projectName: '',
         localVendorName: '',
@@ -294,7 +302,10 @@ export default function EmergencyDC() {
         </div>
         {!showForm && (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+            setForm(f => ({ ...f, dcNo: getNextDCNo(emergencyDCs) }));
+            setShowForm(true);
+          }}
             className="btn-primary flex items-center gap-2 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
@@ -355,13 +366,18 @@ export default function EmergencyDC() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-text-gray mb-1">DC / Bill No</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="Vendor bill / challan no."
-                  value={form.dcNo}
-                  onChange={e => setForm({ ...form, dcNo: e.target.value })}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    className="input-field bg-primary-bg font-mono font-semibold text-primary pr-20 cursor-default"
+                    value={form.dcNo}
+                    readOnly
+                    title="Auto-generated DC number"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 select-none">
+                    Auto
+                  </span>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-text-gray mb-1">Project / Work Order</label>
