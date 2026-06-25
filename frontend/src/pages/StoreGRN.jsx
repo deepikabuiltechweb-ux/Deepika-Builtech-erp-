@@ -332,6 +332,12 @@ export default function StoreGRN() {
       return;
     }
 
+    // Invoice / DC No is mandatory before proceeding
+    if (!formData.dcNo || !formData.dcNo.trim()) {
+      toast.error("DC / Invoice Number is required! Please enter the invoice number to proceed.");
+      return;
+    }
+
     if (formData.items.length === 0) {
       toast.error("Please add at least one item!");
       return;
@@ -392,6 +398,7 @@ export default function StoreGRN() {
 
     const cleanedItems = formData.items.map(item => ({
       ...item,
+      name: (item.name || '').toUpperCase(),
       receivedQty: Number(item.receivedQty || 0),
       rejectedQty: Number(item.rejectedQty || 0),
       unitPrice: Number(item.unitPrice || 0)
@@ -592,7 +599,7 @@ export default function StoreGRN() {
                            <td>
                               {item.fromPO ? (
                                 <div>
-                                  <span className="font-medium text-text-dark block">{item.name || '—'}</span>
+                                  <span className="font-medium text-text-dark block uppercase">{item.name || '—'}</span>
                                   {item.materialId && (
                                     <span className="text-[10px] text-text-gray font-mono">{item.materialId}</span>
                                   )}
@@ -631,24 +638,32 @@ export default function StoreGRN() {
                            </td>
                            <td className="p-2 w-28">
                               <input 
-                                type="number" 
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 className="input-field text-right" 
+                                placeholder="0"
                                 value={item.receivedQty === 0 || item.receivedQty === '0' ? '' : item.receivedQty}
                                 onChange={(e) => {
+                                  const val = e.target.value.replace(/[^0-9]/g, '');
                                   const newItems = [...formData.items];
-                                  newItems[index].receivedQty = e.target.value;
+                                  newItems[index].receivedQty = val;
                                   setFormData({...formData, items: newItems});
                                 }}
                               />
                            </td>
                            <td className="p-2 w-28">
                               <input 
-                                type="number" 
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 className="input-field text-right" 
+                                placeholder="0"
                                 value={item.rejectedQty === 0 || item.rejectedQty === '0' ? '' : item.rejectedQty}
                                 onChange={(e) => {
+                                  const val = e.target.value.replace(/[^0-9]/g, '');
                                   const newItems = [...formData.items];
-                                  newItems[index].rejectedQty = e.target.value;
+                                  newItems[index].rejectedQty = val;
                                   setFormData({...formData, items: newItems});
                                 }}
                               />
@@ -701,6 +716,18 @@ export default function StoreGRN() {
                     )}
                  </tbody>
               </table>
+              {/* Total Amount Row */}
+              {formData.items.length > 0 && (() => {
+                const totalAmt = formData.items.reduce((sum, item) =>
+                  sum + (Number(item.receivedQty || 0) * Number(item.unitPrice || 0)), 0
+                );
+                return (
+                  <div className="p-3 bg-primary-dark flex items-center justify-end gap-4">
+                    <span className="text-white font-bold text-sm uppercase tracking-wide">Total Amount:</span>
+                    <span className="text-white font-extrabold text-lg">₹{totalAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                );
+              })()}
               <div className="p-4 bg-gray-50 border-t border-border">
                  <button type="button" onClick={handleAddItem} className="text-sm font-bold text-primary hover:underline flex items-center gap-1">
                     <Plus className="w-4 h-4" /> Add Item
@@ -934,7 +961,7 @@ export default function StoreGRN() {
                       <tr key={idx} className="border-t border-border hover:bg-gray-50">
                         <td className="px-4 py-2 text-text-gray">{idx + 1}</td>
                         <td className="px-4 py-2 font-mono text-xs">{item.materialId || '—'}</td>
-                        <td className="px-4 py-2 font-medium">{item.name}</td>
+                        <td className="px-4 py-2 font-medium uppercase">{item.name}</td>
                         <td className="px-4 py-2 text-right font-semibold">₹{Number(item.unitPrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         <td className="px-4 py-2 text-right font-bold text-text-dark">₹{(Number(item.receivedQty || 0) * Number(item.unitPrice || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         <td className="px-4 py-2 text-right">{item.poQty !== undefined && item.poQty !== null ? item.poQty : '—'}</td>
@@ -954,6 +981,20 @@ export default function StoreGRN() {
                   </tbody>
                 </table>
               </div>
+              {/* Total Amount in Detail Modal */}
+              {(() => {
+                const modalTotal = selectedGRN.items.reduce((sum, item) =>
+                  sum + (Number(item.receivedQty || 0) * Number(item.unitPrice || 0)), 0
+                );
+                return (
+                  <div className="flex justify-end">
+                    <div className="bg-primary-dark text-white rounded-xl px-6 py-3 flex items-center gap-4">
+                      <span className="font-semibold text-sm uppercase tracking-wide">Total Amount Received:</span>
+                      <span className="font-extrabold text-xl">₹{modalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                );
+              })()}
               {selectedGRN.remarks && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                   <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1">Remarks</p>

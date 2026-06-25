@@ -666,6 +666,33 @@ export default function PurchaseOrders() {
   const addItem = () => setForm(f => ({ ...f, items: [...f.items, emptyItem()] }));
   const removeItem = (idx) => setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
 
+  // Auto-generate next DB-XX item code based on existing PO items
+  const getNextItemCode = () => {
+    let maxNum = 0;
+    purchaseOrders.forEach(po => {
+      (po.items || []).forEach(item => {
+        if (item.itemCode) {
+          const match = String(item.itemCode).match(/DB-(\d+)/i);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      });
+    });
+    // Also check current form items
+    form.items.forEach(item => {
+      if (item.itemCode) {
+        const match = String(item.itemCode).match(/DB-(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+    });
+    return `DB-${String(maxNum + 1).padStart(2, '0')}`;
+  };
+
   const resetForm = () => {
     setDispatchFields({ ...defaultDispatchFields });
     setIsManualVendor(false);
@@ -849,7 +876,10 @@ export default function PurchaseOrders() {
       <div className="space-y-6 animate-in fade-in duration-300">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-4">
-            <button onClick={() => setSelectedPO(null)} className="text-text-gray hover:text-primary font-medium transition-colors">
+            <button 
+              onClick={() => setSelectedPO(null)} 
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg font-bold hover:bg-primary-dark transition-all shadow-md border-2 border-primary"
+            >
               ← Back
             </button>
             <h2 className="text-2xl font-bold">Purchase Order: {selectedPO.id}</h2>
@@ -1641,7 +1671,13 @@ export default function PurchaseOrders() {
                               placeholder="Item name"
                               value={item.itemName}
                               required
-                              onChange={e => handleItemChange(idx, 'itemName', e.target.value)}
+                              onChange={e => handleItemChange(idx, 'itemName', e.target.value.toUpperCase())}
+                              onBlur={(e) => {
+                                // Auto-generate item code on blur if name entered but code is empty
+                                if (e.target.value && !item.itemCode) {
+                                  handleItemChange(idx, 'itemCode', getNextItemCode());
+                                }
+                              }}
                               onDoubleClick={() => setDescModal({
                                 isOpen: true,
                                 itemIndex: idx,
