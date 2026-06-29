@@ -112,8 +112,8 @@ const getTaxBreakdown = (items, taxType) => {
   return rows;
 };
 
-const emptyItem = () => ({
-  itemCode: '',
+const emptyItem = (code = '') => ({
+  itemCode: code,
   itemName: '',
   qty: 1,
   unit: 'Nos',
@@ -129,6 +129,52 @@ export default function PurchaseOrders() {
     vendors, projects, isAdmin, isPurchaseTeam, isStoreTeam, updateVendor, addVendor, addProject,
     materials
   } = useApp();
+
+  // Auto-generate next MAT-XXX item code based on existing materials and PO items
+  const getNextItemCode = (itemName, currentItems = []) => {
+    if (itemName) {
+      const match = materials.find(m => m.name?.toLowerCase().trim() === itemName.toLowerCase().trim());
+      if (match) return match.id;
+    }
+
+    let maxNum = 0;
+    // Check materials catalog
+    (materials || []).forEach(m => {
+      if (m.id) {
+        const match = String(m.id).match(/MAT(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+    });
+
+    // Check existing PO items
+    purchaseOrders.forEach(po => {
+      (po.items || []).forEach(item => {
+        if (item.itemCode) {
+          const match = String(item.itemCode).match(/MAT(\d+)/i);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      });
+    });
+
+    // Also check current items list
+    (currentItems || []).forEach(item => {
+      if (item.itemCode) {
+        const match = String(item.itemCode).match(/MAT(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+    });
+
+    return `MAT${String(maxNum + 1).padStart(3, '0')}`;
+  };
 
   const [selectedPO, setSelectedPO] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -275,7 +321,7 @@ export default function PurchaseOrders() {
     date: format(new Date(), 'yyyy-MM-dd'),
     deliveryDate: '',
     status: 'Sent',
-    items: [emptyItem()],
+    items: [emptyItem(getNextItemCode())],
     dispatchTo: buildDispatchString(defaultDispatchFields),
     deliveryTerms: format(new Date(), 'yyyy-MM-dd'),
     paymentTerms: '45 Days Credit',
@@ -664,54 +710,13 @@ export default function PurchaseOrders() {
     setForm(f => ({ ...f, items: updated }));
   };
 
-  const addItem = () => setForm(f => ({ ...f, items: [...f.items, emptyItem()] }));
-  const removeItem = (idx) => setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
-
-  // Auto-generate next MAT-XXX item code based on existing materials and PO items
-  const getNextItemCode = (itemName) => {
-    if (itemName) {
-      const match = materials.find(m => m.name?.toLowerCase().trim() === itemName.toLowerCase().trim());
-      if (match) return match.id;
-    }
-
-    let maxNum = 0;
-    // Check materials catalog
-    (materials || []).forEach(m => {
-      if (m.id) {
-        const match = String(m.id).match(/MAT(\d+)/i);
-        if (match) {
-          const num = parseInt(match[1], 10);
-          if (num > maxNum) maxNum = num;
-        }
-      }
+  const addItem = () => {
+    setForm(f => {
+      const nextCode = getNextItemCode(null, f.items);
+      return { ...f, items: [...f.items, emptyItem(nextCode)] };
     });
-
-    // Check existing PO items
-    purchaseOrders.forEach(po => {
-      (po.items || []).forEach(item => {
-        if (item.itemCode) {
-          const match = String(item.itemCode).match(/MAT(\d+)/i);
-          if (match) {
-            const num = parseInt(match[1], 10);
-            if (num > maxNum) maxNum = num;
-          }
-        }
-      });
-    });
-
-    // Also check current form items
-    form.items.forEach(item => {
-      if (item.itemCode) {
-        const match = String(item.itemCode).match(/MAT(\d+)/i);
-        if (match) {
-          const num = parseInt(match[1], 10);
-          if (num > maxNum) maxNum = num;
-        }
-      }
-    });
-
-    return `MAT${String(maxNum + 1).padStart(3, '0')}`;
   };
+  const removeItem = (idx) => setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
 
   const resetForm = () => {
     setDispatchFields({ ...defaultDispatchFields });
@@ -734,7 +739,7 @@ export default function PurchaseOrders() {
       date: format(new Date(), 'yyyy-MM-dd'),
       deliveryDate: '',
       status: 'Sent',
-      items: [emptyItem()],
+      items: [emptyItem(getNextItemCode())],
       dispatchTo: buildDispatchString(defaultDispatchFields),
       deliveryTerms: format(new Date(), 'yyyy-MM-dd'),
       paymentTerms: '45 Days Credit',
@@ -1080,7 +1085,10 @@ export default function PurchaseOrders() {
         </div>
         {(isAdmin || isPurchaseTeam || isStoreTeam) && (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
             className="btn-primary flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> New Purchase Order
@@ -1710,7 +1718,7 @@ export default function PurchaseOrders() {
                                     });
                                     setForm(f => ({ ...f, items: updated }));
                                   } else if (!item.itemCode) {
-                                    handleItemChange(idx, 'itemCode', getNextItemCode(typedVal));
+                                    handleItemChange(idx, 'itemCode', getNextItemCode(typedVal, form.items));
                                   }
                                 }
                               }}
