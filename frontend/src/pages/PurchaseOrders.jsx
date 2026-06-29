@@ -126,7 +126,8 @@ const emptyItem = () => ({
 export default function PurchaseOrders() {
   const {
     purchaseOrders, addPurchaseOrder, deletePurchaseOrder, updatePurchaseOrder,
-    vendors, projects, isAdmin, isPurchaseTeam, isStoreTeam, updateVendor, addVendor, addProject
+    vendors, projects, isAdmin, isPurchaseTeam, isStoreTeam, updateVendor, addVendor, addProject,
+    materials
   } = useApp();
 
   const [selectedPO, setSelectedPO] = useState(null);
@@ -666,13 +667,30 @@ export default function PurchaseOrders() {
   const addItem = () => setForm(f => ({ ...f, items: [...f.items, emptyItem()] }));
   const removeItem = (idx) => setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
 
-  // Auto-generate next DB-XX item code based on existing PO items
-  const getNextItemCode = () => {
+  // Auto-generate next MAT-XXX item code based on existing materials and PO items
+  const getNextItemCode = (itemName) => {
+    if (itemName) {
+      const match = materials.find(m => m.name?.toLowerCase().trim() === itemName.toLowerCase().trim());
+      if (match) return match.id;
+    }
+
     let maxNum = 0;
+    // Check materials catalog
+    (materials || []).forEach(m => {
+      if (m.id) {
+        const match = String(m.id).match(/MAT(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+    });
+
+    // Check existing PO items
     purchaseOrders.forEach(po => {
       (po.items || []).forEach(item => {
         if (item.itemCode) {
-          const match = String(item.itemCode).match(/DB-(\d+)/i);
+          const match = String(item.itemCode).match(/MAT(\d+)/i);
           if (match) {
             const num = parseInt(match[1], 10);
             if (num > maxNum) maxNum = num;
@@ -680,17 +698,19 @@ export default function PurchaseOrders() {
         }
       });
     });
+
     // Also check current form items
     form.items.forEach(item => {
       if (item.itemCode) {
-        const match = String(item.itemCode).match(/DB-(\d+)/i);
+        const match = String(item.itemCode).match(/MAT(\d+)/i);
         if (match) {
           const num = parseInt(match[1], 10);
           if (num > maxNum) maxNum = num;
         }
       }
     });
-    return `DB-${String(maxNum + 1).padStart(2, '0')}`;
+
+    return `MAT${String(maxNum + 1).padStart(3, '0')}`;
   };
 
   const resetForm = () => {
@@ -1666,6 +1686,7 @@ export default function PurchaseOrders() {
                           </td>
                           <td className="px-2 py-1">
                             <input
+                              list="materials-list"
                               className="input-field w-full text-xs cursor-zoom-in"
                               title="Double click to edit in pop-up"
                               placeholder="Item name"
@@ -1673,9 +1694,24 @@ export default function PurchaseOrders() {
                               required
                               onChange={e => handleItemChange(idx, 'itemName', e.target.value.toUpperCase())}
                               onBlur={(e) => {
-                                // Auto-generate item code on blur if name entered but code is empty
-                                if (e.target.value && !item.itemCode) {
-                                  handleItemChange(idx, 'itemCode', getNextItemCode());
+                                const typedVal = e.target.value;
+                                if (typedVal) {
+                                  const matchingMat = materials.find(m => m.name?.toLowerCase().trim() === typedVal.toLowerCase().trim());
+                                  if (matchingMat) {
+                                    const updated = form.items.map((it, i) => {
+                                      if (i !== idx) return it;
+                                      return calcItem({
+                                        ...it,
+                                        itemName: matchingMat.name.toUpperCase(),
+                                        itemCode: matchingMat.id,
+                                        unit: matchingMat.unit || it.unit,
+                                        rate: it.rate === 0 || it.rate === '0' ? (matchingMat.latestPrice || matchingMat.lastPrice || 0) : it.rate
+                                      });
+                                    });
+                                    setForm(f => ({ ...f, items: updated }));
+                                  } else if (!item.itemCode) {
+                                    handleItemChange(idx, 'itemCode', getNextItemCode(typedVal));
+                                  }
                                 }
                               }}
                               onDoubleClick={() => setDescModal({
@@ -1888,6 +1924,12 @@ export default function PurchaseOrders() {
           </div>
         </div>
       )}
+      {/* Materials Datalist for Autocomplete */}
+      <datalist id="materials-list">
+        {(materials || []).map(m => (
+          <option key={m.id} value={m.name} />
+        ))}
+      </datalist>
     </div>
   );
 }
